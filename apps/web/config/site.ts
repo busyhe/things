@@ -1,6 +1,6 @@
 export const siteConfig = {
-  name: 'Next.js Starter',
-  url: 'https://github.com/busyhe/nextjs-starter',
+  name: 'things',
+  url: 'https://things.busyhe.com/',
   ogImage: 'https://ui.shadcn.com/og.jpg',
   description: 'A starter template for Next.js 15 with Shadcn UI and Tailwind CSS',
   links: {
