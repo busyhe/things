@@ -1,0 +1,15 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: pnpm prettier --cache --ignore-unknown --write {staged_files}
+      glob: '*.{ts,tsx,md}'
+      stage_fixed: true
+      
+prepare-commit-msg:
+  commands:
+    commitizen:
+      interactive: true
+      run: pnpm czg --hook
+      env:
+        LEFTHOOK: '0'
