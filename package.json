@@ -28,7 +28,9 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "lefthook"
+      "core-js-pure",
+      "lefthook",
+      "sharp"
     ]
   }
 }
