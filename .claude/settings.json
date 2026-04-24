@@ -3,7 +3,11 @@
     "allow": [
       "Bash(pnpm --filter web typecheck)",
       "Bash(pnpm add *)",
-      "Bash(pnpm typecheck *)"
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm view *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm -F web typecheck)",
+      "Bash(pnpm -F web build)"
     ]
   }
 }
