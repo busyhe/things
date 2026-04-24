@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -21,6 +21,7 @@ const actionButton =
 
 export function ItemDetail({ item }: Props) {
   const router = useRouter()
+  const [loaded, setLoaded] = useState(false)
 
   const handleClose = useCallback(() => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -108,7 +109,7 @@ export function ItemDetail({ item }: Props) {
         <motion.div
           className="mx-auto w-full max-w-[500px]"
           initial={{ opacity: 0, scale: 0.85, rotate: -4 }}
-          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          animate={loaded ? { opacity: 1, scale: 1, rotate: 0 } : { opacity: 0, scale: 0.85, rotate: -4 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           whileHover={{ scale: 1.03, rotate: 1 }}
         >
@@ -120,6 +121,7 @@ export function ItemDetail({ item }: Props) {
             sizes="(max-width: 768px) 100vw, 500px"
             className="w-full"
             priority
+            onLoad={() => setLoaded(true)}
           />
         </motion.div>
       </div>
