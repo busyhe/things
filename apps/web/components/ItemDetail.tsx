@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect } from 'react'
+import { motion } from 'motion/react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Download, Flag, Share2, Volume2, X } from 'lucide-react'
@@ -104,15 +105,23 @@ export function ItemDetail({ item }: Props) {
       </div>
 
       <div className="relative mb-6 flex min-h-[200px] w-full items-center justify-center max-md:mt-8 md:mb-0 md:h-full md:w-1/2">
-        <Image
-          src={item.image}
-          alt={item.name}
-          width={1080}
-          height={1080}
-          sizes="(max-width: 768px) 100vw, 500px"
+        <motion.div
           className="mx-auto w-full max-w-[500px]"
-          priority
-        />
+          initial={{ opacity: 0, scale: 0.85, rotate: -4 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          whileHover={{ scale: 1.03, rotate: 1 }}
+        >
+          <Image
+            src={item.image}
+            alt={item.name}
+            width={1080}
+            height={1080}
+            sizes="(max-width: 768px) 100vw, 500px"
+            className="w-full"
+            priority
+          />
+        </motion.div>
       </div>
 
       <div className="flex w-full flex-col justify-center p-4 md:w-1/2 md:p-8">
