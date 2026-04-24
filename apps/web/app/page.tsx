@@ -10,12 +10,13 @@ const STORAGE_KEY = 'things:grid-position'
 
 function GridItem({ item, onNavigate }: { item: ThiingsItem; onNavigate: (id: string) => void }) {
   const delay = useMemo(() => Math.random() * 0.4, [])
+  const [loaded, setLoaded] = useState(false)
 
   return (
     <motion.div
       className="group absolute inset-5 flex cursor-pointer items-center justify-center text-white"
       initial={{ opacity: 0, scale: 0.6 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={loaded ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.6 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay }}
       onClick={() => onNavigate(item.id)}
     >
@@ -27,6 +28,7 @@ function GridItem({ item, onNavigate }: { item: ThiingsItem; onNavigate: (id: st
         alt={item.name}
         width={160}
         height={160}
+        onLoad={() => setLoaded(true)}
       />
     </motion.div>
   )
