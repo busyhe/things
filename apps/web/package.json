@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/model-viewer": "^4.2.0",
     "@workspace/ui": "workspace:*",
     "lucide-react": "catalog:",
     "motion": "^12.38.0",

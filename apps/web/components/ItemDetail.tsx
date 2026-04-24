@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Download, Flag, Share2, Volume2, X } from 'lucide-react'
+import { ArrowLeft, Box, Download, Flag, ImageIcon, Share2, Volume2, X } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import type { ThiingsItem } from '@/lib/thiings-data'
+import { ModelViewer, getModelExtension } from '@/components/ModelViewer'
 
 type Props = {
   item: ThiingsItem
@@ -23,6 +24,8 @@ export function ItemDetail({ item }: Props) {
   const router = useRouter()
   const [loaded, setLoaded] = useState(false)
   const [canHover, setCanHover] = useState(false)
+  const [mode, setMode] = useState<'image' | 'model'>('image')
+  const hasModel = Boolean(item.model)
 
   useEffect(() => {
     const mq = window.matchMedia('(hover: hover)')
@@ -65,13 +68,16 @@ export function ItemDetail({ item }: Props) {
   }, [item.name, item.description])
 
   const handleDownload = useCallback(async () => {
+    const isModel = mode === 'model' && item.model
+    const target = isModel ? item.model! : item.image
+    const ext = isModel ? getModelExtension(item.model!) || 'glb' : 'png'
     try {
-      const res = await fetch(item.image)
+      const res = await fetch(target)
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${item.name}.png`
+      a.download = `${item.name}.${ext}`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -79,7 +85,7 @@ export function ItemDetail({ item }: Props) {
     } catch {
       // network failed — no-op
     }
-  }, [item.image, item.name])
+  }, [mode, item.model, item.image, item.name])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -130,24 +136,41 @@ export function ItemDetail({ item }: Props) {
       </div>
 
       <div className="relative mb-6 flex aspect-square w-full items-center justify-center max-md:mt-4 md:mb-0 md:aspect-auto md:h-full md:min-h-[200px] md:w-1/2">
-        <motion.div
-          className="mx-auto w-full max-w-[500px]"
-          initial={{ opacity: 0, scale: 0.85, rotate: -4 }}
-          animate={loaded ? { opacity: 1, scale: 1, rotate: 0 } : { opacity: 0, scale: 0.85, rotate: -4 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          whileHover={canHover ? { scale: 1.03, rotate: 1 } : undefined}
-        >
-          <Image
-            src={item.image}
-            alt={item.name}
-            width={1080}
-            height={1080}
-            sizes="(max-width: 768px) 100vw, 500px"
-            className="w-full"
-            priority
-            onLoad={() => setLoaded(true)}
-          />
-        </motion.div>
+        <AnimatePresence mode="wait" initial={false}>
+          {mode === 'image' || !item.model ? (
+            <motion.div
+              key="image"
+              className="mx-auto w-full max-w-[500px]"
+              initial={{ opacity: 0, scale: 0.85, rotate: -4 }}
+              animate={loaded ? { opacity: 1, scale: 1, rotate: 0 } : { opacity: 0, scale: 0.85, rotate: -4 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={canHover ? { scale: 1.03, rotate: 1 } : undefined}
+            >
+              <Image
+                src={item.image}
+                alt={item.name}
+                width={1080}
+                height={1080}
+                sizes="(max-width: 768px) 100vw, 500px"
+                className="w-full"
+                priority
+                onLoad={() => setLoaded(true)}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="model"
+              className="mx-auto w-full max-w-[500px]"
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <ModelViewer src={item.model} alt={item.name} poster={item.modelPoster ?? item.image} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="flex w-full flex-col justify-center md:w-1/2 md:p-8">
@@ -166,15 +189,34 @@ export function ItemDetail({ item }: Props) {
 
         <p className="text-base text-black/80 md:text-lg">{item.description}</p>
 
-        <div className="flex gap-3 md:gap-4">
+        <div className="flex flex-wrap gap-3 md:gap-4">
           <Button className={cn(actionButton)} onClick={handleClose}>
             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
             <span className="max-md:hidden">Back to Grid</span>
             <span className="md:hidden">Back</span>
           </Button>
+          {hasModel && (
+            <Button className={cn(actionButton)} onClick={() => setMode((m) => (m === 'image' ? 'model' : 'image'))}>
+              {mode === 'image' ? (
+                <>
+                  <Box className="mr-2 h-4 w-4" aria-hidden />
+                  <span className="max-md:hidden">View 3D Model</span>
+                  <span className="md:hidden">3D</span>
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="mr-2 h-4 w-4" aria-hidden />
+                  <span className="max-md:hidden">View Image</span>
+                  <span className="md:hidden">Image</span>
+                </>
+              )}
+            </Button>
+          )}
           <Button className={cn(actionButton)} onClick={handleDownload}>
             <Download className="mr-2 h-4 w-4" aria-hidden />
-            <span className="max-md:hidden">Download Image</span>
+            <span className="max-md:hidden">
+              {mode === 'model' && item.model ? 'Download 3D File' : 'Download Image'}
+            </span>
             <span className="md:hidden">Download</span>
           </Button>
         </div>

@@ -4,6 +4,8 @@ export type ThiingsItem = {
   name: string
   description: string
   tags: string[]
+  model?: string
+  modelPoster?: string
 }
 
 export const thiingsItems: ThiingsItem[] = [
@@ -13,7 +15,8 @@ export const thiingsItems: ThiingsItem[] = [
     name: 'Umbrella',
     description:
       'A portable device used for protection against rain or sunlight, typically consisting of a circular fabric canopy mounted on a folding metal frame with a central handle.',
-    tags: ['everyday life', 'personal care', 'weather', 'outdoor']
+    tags: ['everyday life', 'personal care', 'weather', 'outdoor'],
+    model: 'https://modelviewer.dev/shared-assets/models/Astronaut.glb'
   },
   {
     id: '2',
@@ -29,7 +32,8 @@ export const thiingsItems: ThiingsItem[] = [
     name: 'Camera',
     description:
       'A device that captures light through a lens and records images onto a sensor or film, preserving moments in time as photographs or video.',
-    tags: ['technology', 'photography', 'hobby']
+    tags: ['technology', 'photography', 'hobby'],
+    model: 'https://modelviewer.dev/shared-assets/models/reflective-sphere.gltf'
   },
   {
     id: '4',
@@ -45,7 +49,8 @@ export const thiingsItems: ThiingsItem[] = [
     name: 'Backpack',
     description:
       'A bag with shoulder straps worn on the back, used to carry books, gear, or travel essentials with both hands free.',
-    tags: ['travel', 'school', 'outdoor', 'everyday life']
+    tags: ['travel', 'school', 'outdoor', 'everyday life'],
+    model: '/thiings/5.stl'
   },
   {
     id: '6',
