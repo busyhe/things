@@ -23,6 +23,30 @@ export function isModelFile(url: string | undefined): boolean {
   return ext === 'glb' || ext === 'gltf' || ext === 'stl' || ext === '3mf'
 }
 
+let modelViewerLoader: Promise<unknown> | null = null
+
+function loadModelViewer(): Promise<unknown> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  if (!modelViewerLoader) {
+    modelViewerLoader = import('@google/model-viewer')
+  }
+  return modelViewerLoader
+}
+
+const warmedSources = new Set<string>()
+
+export function preloadModel(src: string | undefined): void {
+  if (!src || typeof window === 'undefined') return
+  const ext = getModelExtension(src)
+  if (ext !== 'glb' && ext !== 'gltf') return
+  loadModelViewer()
+  if (warmedSources.has(src)) return
+  warmedSources.add(src)
+  fetch(src, { mode: 'cors', credentials: 'omit' }).catch(() => {
+    warmedSources.delete(src)
+  })
+}
+
 export function ModelViewer({ src, alt, poster, className }: Props) {
   const ext = getModelExtension(src)
   const isWebNative = ext === 'glb' || ext === 'gltf'
@@ -31,7 +55,7 @@ export function ModelViewer({ src, alt, poster, className }: Props) {
   useEffect(() => {
     if (!isWebNative) return
     let cancelled = false
-    import('@google/model-viewer').then(() => {
+    loadModelViewer().then(() => {
       if (!cancelled) setRegistered(true)
     })
     return () => {

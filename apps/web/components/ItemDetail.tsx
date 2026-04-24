@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Box, Download, Flag, ImageIcon, Share2, Volume2, X } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import type { ThiingsItem } from '@/lib/thiings-data'
-import { ModelViewer, getModelExtension } from '@/components/ModelViewer'
+import { ModelViewer, getModelExtension, preloadModel } from '@/components/ModelViewer'
 
 type Props = {
   item: ThiingsItem
@@ -26,6 +26,10 @@ export function ItemDetail({ item }: Props) {
   const [canHover, setCanHover] = useState(false)
   const [mode, setMode] = useState<'image' | 'model'>('image')
   const hasModel = Boolean(item.model)
+
+  useEffect(() => {
+    if (item.model) preloadModel(item.model)
+  }, [item.model])
 
   useEffect(() => {
     const mq = window.matchMedia('(hover: hover)')
@@ -136,41 +140,42 @@ export function ItemDetail({ item }: Props) {
       </div>
 
       <div className="relative mb-6 flex aspect-square w-full items-center justify-center max-md:mt-4 md:mb-0 md:aspect-auto md:h-full md:min-h-[200px] md:w-1/2">
-        <AnimatePresence mode="wait" initial={false}>
-          {mode === 'image' || !item.model ? (
-            <motion.div
-              key="image"
-              className="mx-auto w-full max-w-[500px]"
-              initial={{ opacity: 0, scale: 0.85, rotate: -4 }}
-              animate={loaded ? { opacity: 1, scale: 1, rotate: 0 } : { opacity: 0, scale: 0.85, rotate: -4 }}
-              exit={{ opacity: 0, scale: 0.92 }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              whileHover={canHover ? { scale: 1.03, rotate: 1 } : undefined}
-            >
-              <Image
-                src={item.image}
-                alt={item.name}
-                width={1080}
-                height={1080}
-                sizes="(max-width: 768px) 100vw, 500px"
-                className="w-full"
-                priority
-                onLoad={() => setLoaded(true)}
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="model"
-              className="mx-auto w-full max-w-[500px]"
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.92 }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <ModelViewer src={item.model} alt={item.name} poster={item.modelPoster ?? item.image} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <motion.div
+          className="mx-auto w-full max-w-[500px]"
+          initial={{ opacity: 0, scale: 0.85, rotate: -4 }}
+          animate={
+            mode === 'model' && item.model
+              ? { opacity: 0, scale: 0.88, rotate: -4 }
+              : loaded
+                ? { opacity: 1, scale: 1, rotate: 0 }
+                : { opacity: 0, scale: 0.85, rotate: -4 }
+          }
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          whileHover={canHover && mode === 'image' ? { scale: 1.03, rotate: 1 } : undefined}
+          style={{ pointerEvents: mode === 'model' && item.model ? 'none' : undefined }}
+        >
+          <Image
+            src={item.image}
+            alt={item.name}
+            width={1080}
+            height={1080}
+            sizes="(max-width: 768px) 100vw, 500px"
+            className="w-full"
+            priority
+            onLoad={() => setLoaded(true)}
+          />
+        </motion.div>
+        {hasModel && item.model && (
+          <motion.div
+            className="absolute inset-0 mx-auto flex w-full max-w-[500px] items-center justify-center"
+            initial={{ opacity: 0, scale: 0.88, rotate: 4 }}
+            animate={mode === 'model' ? { opacity: 1, scale: 1, rotate: 0 } : { opacity: 0, scale: 0.88, rotate: 4 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            style={{ pointerEvents: mode === 'model' ? 'auto' : 'none' }}
+          >
+            <ModelViewer src={item.model} alt={item.name} poster={item.modelPoster ?? item.image} />
+          </motion.div>
+        )}
       </div>
 
       <div className="flex w-full flex-col justify-center md:w-1/2 md:p-8">
