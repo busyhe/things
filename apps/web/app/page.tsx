@@ -23,7 +23,7 @@ function GridItem({ item, onNavigate }: { item: ThiingsItem; onNavigate: (id: st
       <Image
         draggable={false}
         priority
-        className="h-full w-full transition-transform group-hover:scale-110 active:scale-95"
+        className="h-full w-full transition-transform active:scale-95 md:group-hover:scale-110"
         src={item.image}
         alt={item.name}
         width={160}
@@ -38,6 +38,7 @@ export default function Page() {
   const router = useRouter()
   const gridRef = useRef<ThiingsGrid>(null)
   const [initialPosition, setInitialPosition] = useState<{ x: number; y: number } | null>(null)
+  const [gridSize, setGridSize] = useState(200)
   const isMovingRef = useRef(false)
 
   useEffect(() => {
@@ -49,6 +50,13 @@ export default function Page() {
       // ignore
     }
     setInitialPosition(pos)
+  }, [])
+
+  useEffect(() => {
+    const update = () => setGridSize(window.innerWidth < 768 ? 140 : 200)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
   }, [])
 
   const handleNavigate = useCallback(
@@ -76,5 +84,5 @@ export default function Page() {
 
   if (!initialPosition) return null
 
-  return <ThiingsGrid ref={gridRef} gridSize={200} renderItem={renderItem} initialPosition={initialPosition} />
+  return <ThiingsGrid ref={gridRef} gridSize={gridSize} renderItem={renderItem} initialPosition={initialPosition} />
 }
