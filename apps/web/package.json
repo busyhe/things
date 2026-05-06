@@ -18,6 +18,9 @@
     "motion": "^12.38.0",
     "next": "catalog:",
     "next-themes": "catalog:",
+    "notion-client": "7.10.0",
+    "notion-types": "7.10.0",
+    "notion-utils": "7.10.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "three": "^0.182.0"

@@ -1,88 +1,9 @@
-'use client'
-import ThiingsGrid, { type ItemConfig } from '@/components/ThiingsGrid'
-import { getThiingsItemByGridIndex, type ThiingsItem } from '@/lib/thiings-data'
-import { motion } from 'motion/react'
-import Image from 'next/image'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ThiingsHome } from '@/components/ThiingsHome'
+import { getThiingsItems } from '@/lib/thiings-data'
 
-const STORAGE_KEY = 'things:grid-position'
+export const revalidate = 300
 
-function GridItem({ item, onNavigate }: { item: ThiingsItem; onNavigate: (id: string) => void }) {
-  const delay = useMemo(() => Math.random() * 0.4, [])
-  const [loaded, setLoaded] = useState(false)
-
-  return (
-    <motion.div
-      className="group absolute inset-5 flex cursor-pointer items-center justify-center text-white"
-      initial={{ opacity: 0, scale: 0.6 }}
-      animate={loaded ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.6 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay }}
-      onClick={() => onNavigate(item.id)}
-    >
-      <Image
-        draggable={false}
-        priority
-        className="h-full w-full transition-transform active:scale-95 md:group-hover:scale-110"
-        src={item.image}
-        alt={item.name}
-        width={160}
-        height={160}
-        onLoad={() => setLoaded(true)}
-      />
-    </motion.div>
-  )
-}
-
-export default function Page() {
-  const router = useRouter()
-  const gridRef = useRef<ThiingsGrid>(null)
-  const [initialPosition, setInitialPosition] = useState<{ x: number; y: number } | null>(null)
-  const [gridSize, setGridSize] = useState(200)
-  const isMovingRef = useRef(false)
-
-  useEffect(() => {
-    let pos = { x: 0, y: 0 }
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY)
-      if (raw) pos = JSON.parse(raw)
-    } catch {
-      // ignore
-    }
-    setInitialPosition(pos)
-  }, [])
-
-  useEffect(() => {
-    const update = () => setGridSize(window.innerWidth < 768 ? 140 : 200)
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [])
-
-  const handleNavigate = useCallback(
-    (id: string) => {
-      if (isMovingRef.current) return
-      try {
-        const current = gridRef.current?.publicGetCurrentPosition()
-        if (current) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(current))
-      } catch {
-        // ignore
-      }
-      router.push(`/item/${id}`)
-    },
-    [router]
-  )
-
-  const renderItem = useCallback(
-    ({ gridIndex, isMoving }: ItemConfig) => {
-      isMovingRef.current = isMoving
-      const item = getThiingsItemByGridIndex(gridIndex)
-      return <GridItem item={item} onNavigate={handleNavigate} />
-    },
-    [handleNavigate]
-  )
-
-  if (!initialPosition) return null
-
-  return <ThiingsGrid ref={gridRef} gridSize={gridSize} renderItem={renderItem} initialPosition={initialPosition} />
+export default async function Page() {
+  const items = await getThiingsItems()
+  return <ThiingsHome items={items} />
 }

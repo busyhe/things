@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Box, Download, Flag, ImageIcon, Share2, Volume2, X } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
-import type { ThiingsItem } from '@/lib/thiings-data'
+import { isNotionHostedResource, type ThiingsItem } from '@/lib/thiings'
 import { ModelViewer, getModelExtension, preloadModel } from '@/components/ModelViewer'
 
 type Props = {
@@ -26,6 +26,7 @@ export function ItemDetail({ item }: Props) {
   const [canHover, setCanHover] = useState(false)
   const [mode, setMode] = useState<'image' | 'model'>('image')
   const hasModel = Boolean(item.model)
+  const shouldBypassImageOptimization = isNotionHostedResource(item.image)
 
   useEffect(() => {
     if (item.model) preloadModel(item.model)
@@ -162,6 +163,7 @@ export function ItemDetail({ item }: Props) {
             sizes="(max-width: 768px) 100vw, 500px"
             className="h-full w-full object-contain"
             priority
+            unoptimized={shouldBypassImageOptimization}
             onLoad={() => setLoaded(true)}
           />
         </motion.div>
