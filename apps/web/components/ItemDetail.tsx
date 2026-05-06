@@ -139,9 +139,9 @@ export function ItemDetail({ item }: Props) {
         </button>
       </div>
 
-      <div className="relative mb-6 flex aspect-square w-full items-center justify-center max-md:mt-4 md:mb-0 md:aspect-auto md:h-full md:min-h-[200px] md:w-1/2">
+      <div className="relative mb-6 flex w-full items-center justify-center pt-14 md:mb-0 md:h-full md:min-h-[200px] md:w-1/2 md:pt-0">
         <motion.div
-          className="mx-auto w-full max-w-[500px]"
+          className="mx-auto aspect-square w-[min(100%,500px)]"
           initial={{ opacity: 0, scale: 0.85, rotate: -4 }}
           animate={
             mode === 'model' && item.model
@@ -160,20 +160,25 @@ export function ItemDetail({ item }: Props) {
             width={1080}
             height={1080}
             sizes="(max-width: 768px) 100vw, 500px"
-            className="w-full"
+            className="h-full w-full object-contain"
             priority
             onLoad={() => setLoaded(true)}
           />
         </motion.div>
         {hasModel && item.model && (
           <motion.div
-            className="absolute inset-0 mx-auto flex w-full max-w-[500px] items-center justify-center"
+            className="absolute inset-x-0 top-14 mx-auto flex aspect-square w-[min(100%,500px)] items-center justify-center md:inset-y-0 md:my-auto"
             initial={{ opacity: 0, scale: 0.88, rotate: 4 }}
             animate={mode === 'model' ? { opacity: 1, scale: 1, rotate: 0 } : { opacity: 0, scale: 0.88, rotate: 4 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             style={{ pointerEvents: mode === 'model' ? 'auto' : 'none' }}
           >
-            <ModelViewer src={item.model} alt={item.name} poster={item.modelPoster ?? item.image} />
+            <ModelViewer
+              src={item.model}
+              alt={item.name}
+              poster={item.modelPoster ?? item.image}
+              className="h-full w-full"
+            />
           </motion.div>
         )}
       </div>

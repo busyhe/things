@@ -50,7 +50,7 @@ export const thiingsItems: ThiingsItem[] = [
     description:
       'A bag with shoulder straps worn on the back, used to carry books, gear, or travel essentials with both hands free.',
     tags: ['travel', 'school', 'outdoor', 'everyday life'],
-    model: '/thiings/5.stl'
+    model: 'https://threejs.org/examples/models/stl/binary/pr2_head_pan.stl'
   },
   {
     id: '6',
