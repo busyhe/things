@@ -140,7 +140,7 @@ export function ItemDetail({ item }: Props) {
         </button>
       </div>
 
-      <div className="relative mb-6 flex w-full items-center justify-center pt-14 md:mb-0 md:h-full md:min-h-[200px] md:w-1/2 md:pt-0">
+      <div className="relative mb-6 flex w-full items-center justify-center pt-14 md:mb-0 md:h-full md:min-h-[200px] md:w-[58%] md:pt-0 xl:w-[62%]">
         <motion.div
           className="mx-auto aspect-square w-[min(100%,500px)]"
           initial={{ opacity: 0, scale: 0.85, rotate: -4 }}
@@ -169,7 +169,7 @@ export function ItemDetail({ item }: Props) {
         </motion.div>
         {hasModel && item.model && (
           <motion.div
-            className="absolute inset-x-0 top-14 mx-auto flex aspect-square w-[min(100%,500px)] items-center justify-center md:inset-y-0 md:my-auto"
+            className="absolute inset-x-0 top-14 mx-auto flex aspect-square w-[min(100%,500px)] items-center justify-center md:inset-y-0 md:my-auto md:w-[min(92%,720px,82vh)] xl:w-[min(92%,820px,84vh)]"
             initial={{ opacity: 0, scale: 0.88, rotate: 4 }}
             animate={mode === 'model' ? { opacity: 1, scale: 1, rotate: 0 } : { opacity: 0, scale: 0.88, rotate: 4 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -185,7 +185,7 @@ export function ItemDetail({ item }: Props) {
         )}
       </div>
 
-      <div className="flex w-full flex-col justify-center md:w-1/2 md:p-8">
+      <div className="flex w-full flex-col justify-center md:w-[42%] md:p-8 xl:w-[38%]">
         <div className="mb-4 flex flex-wrap gap-2">
           {item.tags.map((tag) => (
             <span

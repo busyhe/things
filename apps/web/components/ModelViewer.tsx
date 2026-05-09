@@ -46,13 +46,43 @@ export function preloadModel(src: string | undefined): void {
   })
 }
 
-type StlModelViewerProps = {
+type ThreeModelExtension = 'stl' | '3mf'
+
+type ThreeModelViewerProps = {
   src: string
   alt: string
+  extension: ThreeModelExtension
   className?: string
 }
 
-function StlModelViewer({ src, alt, className }: StlModelViewerProps) {
+const appleTechGray = 0xaeb4bc
+const autoRotateSpeed = 0.001
+
+function createDefaultMaterial(THREE: typeof import('three')) {
+  return new THREE.MeshStandardMaterial({
+    color: appleTechGray,
+    emissive: appleTechGray,
+    emissiveIntensity: 0.14,
+    metalness: 0.04,
+    roughness: 0.42,
+    side: THREE.DoubleSide
+  })
+}
+
+function disposeMaterial(material: import('three').Material | import('three').Material[]) {
+  const materials = Array.isArray(material) ? material : [material]
+  materials.forEach((entry) => entry.dispose())
+}
+
+function disposeObject(object: import('three').Object3D) {
+  object.traverse((child) => {
+    const mesh = child as import('three').Mesh
+    mesh.geometry?.dispose()
+    if (mesh.material) disposeMaterial(mesh.material)
+  })
+}
+
+function ThreeModelViewer({ src, alt, extension, className }: ThreeModelViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
@@ -66,18 +96,28 @@ function StlModelViewer({ src, alt, className }: StlModelViewerProps) {
 
     setStatus('loading')
 
-    Promise.all([
-      import('three'),
-      import('three/examples/jsm/loaders/STLLoader.js'),
-      import('three/examples/jsm/controls/OrbitControls.js')
-    ])
-      .then(([THREE, { STLLoader }, { OrbitControls }]) => {
+    const loaderImports =
+      extension === '3mf'
+        ? Promise.all([
+            import('three'),
+            import('three/examples/jsm/loaders/3MFLoader.js'),
+            import('three/examples/jsm/controls/OrbitControls.js')
+          ])
+        : Promise.all([
+            import('three'),
+            import('three/examples/jsm/loaders/STLLoader.js'),
+            import('three/examples/jsm/controls/OrbitControls.js')
+          ])
+
+    loaderImports
+      .then(([THREE, loaderModule, { OrbitControls }]) => {
         if (cancelled) return
 
         const scene = new THREE.Scene()
         const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 2000)
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
         renderer.setClearColor(0x000000, 0)
+        renderer.outputColorSpace = THREE.SRGBColorSpace
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
         renderer.domElement.setAttribute('aria-label', alt)
         renderer.domElement.style.display = 'block'
@@ -93,14 +133,19 @@ function StlModelViewer({ src, alt, className }: StlModelViewerProps) {
         controls.minDistance = 0.1
         controls.maxDistance = 2000
 
-        scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 2.2))
-        const keyLight = new THREE.DirectionalLight(0xffffff, 2.4)
+        scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x8f96a3, 2.4))
+        const keyLight = new THREE.DirectionalLight(0xffffff, 2.5)
         keyLight.position.set(3, 4, 5)
         scene.add(keyLight)
+        const fillLight = new THREE.DirectionalLight(0xffffff, 1.1)
+        fillLight.position.set(-4, 2, -3)
+        scene.add(fillLight)
 
-        const loader = new STLLoader()
-        let geometry: import('three').BufferGeometry | undefined
-        let material: import('three').MeshStandardMaterial | undefined
+        const pivot = new THREE.Group()
+        scene.add(pivot)
+        let loadedObject: import('three').Object3D | undefined
+        let rotating = false
 
         const resize = () => {
           const width = container.clientWidth
@@ -115,49 +160,92 @@ function StlModelViewer({ src, alt, className }: StlModelViewerProps) {
         resizeObserver.observe(container)
         resize()
 
-        loader.load(
-          src,
-          (loadedGeometry) => {
-            if (cancelled) {
-              loadedGeometry.dispose()
-              return
-            }
+        const frameObject = (object: import('three').Object3D) => {
+          const box = new THREE.Box3().setFromObject(object)
+          if (box.isEmpty()) return
 
-            geometry = loadedGeometry
-            geometry.computeVertexNormals()
-            geometry.computeBoundingBox()
-            geometry.center()
-            geometry.computeBoundingSphere()
+          const center = box.getCenter(new THREE.Vector3())
+          const size = box.getSize(new THREE.Vector3())
+          object.position.sub(center)
 
-            const radius = Math.max(geometry.boundingSphere?.radius ?? 1, 0.1)
-            material = new THREE.MeshStandardMaterial({
-              color: 0xd8d4cc,
-              metalness: 0.05,
-              roughness: 0.45
-            })
+          const radius = Math.max(size.length() * 0.5, 0.1)
+          const distance = radius * 3.1
 
-            const mesh = new THREE.Mesh(geometry, material)
-            scene.add(mesh)
+          camera.position.set(distance, distance * 0.8, distance)
+          camera.near = Math.max(radius / 100, 0.01)
+          camera.far = radius * 100
+          camera.updateProjectionMatrix()
+          controls.target.set(0, 0, 0)
+          controls.minDistance = radius * 0.7
+          controls.maxDistance = radius * 8
+          controls.update()
+          resize()
+        }
 
-            const distance = radius * 3.2
-            camera.position.set(distance, distance * 0.8, distance)
-            camera.near = Math.max(radius / 100, 0.01)
-            camera.far = radius * 100
-            camera.updateProjectionMatrix()
-            controls.target.set(0, 0, 0)
-            controls.minDistance = radius * 0.7
-            controls.maxDistance = radius * 8
-            controls.update()
+        const applyAppleTechGray = (object: import('three').Object3D) => {
+          object.traverse((child) => {
+            const mesh = child as import('three').Mesh
+            if (!mesh.isMesh) return
+            mesh.geometry.deleteAttribute('color')
+            mesh.geometry.computeVertexNormals()
+            mesh.castShadow = true
+            mesh.receiveShadow = true
+            if (mesh.material) disposeMaterial(mesh.material)
+            mesh.material = createDefaultMaterial(THREE)
+          })
+        }
 
-            setStatus('ready')
-          },
-          undefined,
-          () => {
-            if (!cancelled) setStatus('error')
+        const handleObjectLoad = (object: import('three').Object3D) => {
+          if (cancelled) {
+            disposeObject(object)
+            return
           }
-        )
+
+          applyAppleTechGray(object)
+          pivot.add(object)
+          frameObject(object)
+          loadedObject = object
+          rotating = true
+          setStatus('ready')
+        }
+
+        if (extension === '3mf') {
+          const { ThreeMFLoader } = loaderModule as typeof import('three/examples/jsm/loaders/3MFLoader.js')
+          const loader = new ThreeMFLoader()
+          loader.load(
+            src,
+            (group) => {
+              group.rotation.set(-Math.PI / 2, 0, 0)
+              handleObjectLoad(group)
+            },
+            undefined,
+            () => {
+              if (!cancelled) setStatus('error')
+            }
+          )
+        } else {
+          const { STLLoader } = loaderModule as typeof import('three/examples/jsm/loaders/STLLoader.js')
+          const loader = new STLLoader()
+          loader.load(
+            src,
+            (geometry) => {
+              if (cancelled) {
+                geometry.dispose()
+                return
+              }
+              geometry.computeVertexNormals()
+              const mesh = new THREE.Mesh(geometry, createDefaultMaterial(THREE))
+              handleObjectLoad(mesh)
+            },
+            undefined,
+            () => {
+              if (!cancelled) setStatus('error')
+            }
+          )
+        }
 
         const animate = () => {
+          if (rotating) pivot.rotation.y += autoRotateSpeed
           controls.update()
           renderer.render(scene, camera)
           animationFrame = window.requestAnimationFrame(animate)
@@ -168,8 +256,7 @@ function StlModelViewer({ src, alt, className }: StlModelViewerProps) {
           window.cancelAnimationFrame(animationFrame)
           resizeObserver.disconnect()
           controls.dispose()
-          geometry?.dispose()
-          material?.dispose()
+          if (loadedObject) disposeObject(loadedObject)
           renderer.dispose()
           renderer.domElement.remove()
         }
@@ -182,7 +269,7 @@ function StlModelViewer({ src, alt, className }: StlModelViewerProps) {
       cancelled = true
       cleanup?.()
     }
-  }, [src, alt])
+  }, [src, alt, extension])
 
   return (
     <div
@@ -209,7 +296,7 @@ function StlModelViewer({ src, alt, className }: StlModelViewerProps) {
 export function ModelViewer({ src, alt, poster, className }: Props) {
   const ext = getModelExtension(src)
   const isWebNative = ext === 'glb' || ext === 'gltf'
-  const isStl = ext === 'stl'
+  const isThreeRenderable = ext === 'stl' || ext === '3mf'
   const [registered, setRegistered] = useState(false)
 
   useEffect(() => {
@@ -223,8 +310,8 @@ export function ModelViewer({ src, alt, poster, className }: Props) {
     }
   }, [isWebNative])
 
-  if (isStl) {
-    return <StlModelViewer src={src} alt={alt} className={className} />
+  if (isThreeRenderable) {
+    return <ThreeModelViewer src={src} alt={alt} extension={ext} className={className} />
   }
 
   if (!isWebNative) {
