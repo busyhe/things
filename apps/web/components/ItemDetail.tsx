@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Box, Download, Flag, ImageIcon, Share2, Volume2, X } from 'lucide-react'
+import { ArrowLeft, Box, ChevronDown, Download, Flag, ImageIcon, Share2, Volume2, X } from 'lucide-react'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { isNotionHostedResource, type ThiingsItem } from '@/lib/thiings'
@@ -18,13 +18,20 @@ const iconButton =
   'inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/10 p-2 text-black/80 transition-colors hover:bg-black/20'
 
 const actionButton =
-  'mt-6 h-9 flex-1 rounded-full bg-black px-6 py-2 text-white shadow transition-colors hover:bg-gray-800 md:mt-8 md:w-auto md:flex-none'
+  'h-9 min-w-0 rounded-full bg-black px-2 py-2 text-xs text-white shadow transition-colors hover:bg-gray-800 sm:px-3 sm:text-sm xl:px-4'
+
+const downloadButton =
+  'h-9 w-full min-w-0 rounded-full bg-black px-2 py-2 text-xs text-white shadow transition-colors hover:bg-gray-800 sm:px-3 sm:text-sm xl:px-4'
+
+type DownloadTarget = 'image' | 'model'
 
 export function ItemDetail({ item }: Props) {
   const router = useRouter()
+  const downloadMenuRef = useRef<HTMLDivElement>(null)
   const [loaded, setLoaded] = useState(false)
   const [canHover, setCanHover] = useState(false)
   const [mode, setMode] = useState<'image' | 'model'>('image')
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
   const hasModel = Boolean(item.model)
   const shouldBypassImageOptimization = isNotionHostedResource(item.image)
 
@@ -72,33 +79,69 @@ export function ItemDetail({ item }: Props) {
     }
   }, [item.name, item.description])
 
-  const handleDownload = useCallback(async () => {
-    const isModel = mode === 'model' && item.model
-    const target = isModel ? item.model! : item.image
-    const ext = isModel ? getModelExtension(item.model!) || 'glb' : 'png'
-    try {
-      const res = await fetch(target)
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${item.name}.${ext}`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-    } catch {
-      // network failed — no-op
+  const handleDownload = useCallback(
+    async (downloadTarget: DownloadTarget) => {
+      const isModel = downloadTarget === 'model' && item.model
+      const target = isModel ? item.model! : item.image
+      const ext = isModel ? getModelExtension(item.model!) || 'glb' : 'png'
+      try {
+        const res = await fetch(target)
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${item.name}.${ext}`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+      } catch {
+        // network failed — no-op
+      }
+    },
+    [item.model, item.image, item.name]
+  )
+
+  const handleDownloadClick = useCallback(() => {
+    if (!hasModel) {
+      void handleDownload('image')
+      return
     }
-  }, [mode, item.model, item.image, item.name])
+
+    setDownloadMenuOpen((open) => !open)
+  }, [hasModel, handleDownload])
+
+  const handleDownloadOption = useCallback(
+    (downloadTarget: DownloadTarget) => {
+      setDownloadMenuOpen(false)
+      void handleDownload(downloadTarget)
+    },
+    [handleDownload]
+  )
+
+  useEffect(() => {
+    if (!downloadMenuOpen) return
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (downloadMenuRef.current?.contains(event.target as Node)) return
+      setDownloadMenuOpen(false)
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [downloadMenuOpen])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && downloadMenuOpen) {
+        setDownloadMenuOpen(false)
+        return
+      }
       if (e.key === 'Escape') handleClose()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [handleClose])
+  }, [downloadMenuOpen, handleClose])
 
   useEffect(() => {
     const prev = document.body.style.overflow
@@ -201,36 +244,77 @@ export function ItemDetail({ item }: Props) {
 
         <p className="text-base text-black/80 md:text-lg">{item.description}</p>
 
-        <div className="flex flex-wrap gap-3 md:gap-4">
-          <Button className={cn(actionButton)} onClick={handleClose}>
-            <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
-            <span className="max-md:hidden">Back to Grid</span>
-            <span className="md:hidden">Back</span>
+        <div className={cn('mt-6 grid gap-2 md:mt-8 md:gap-3', hasModel ? 'grid-cols-3' : 'grid-cols-2')}>
+          <Button className={cn(actionButton)} onClick={handleClose} aria-label="Back to grid">
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline xl:hidden">Back</span>
+            <span className="hidden xl:inline">Back to Grid</span>
           </Button>
           {hasModel && (
-            <Button className={cn(actionButton)} onClick={() => setMode((m) => (m === 'image' ? 'model' : 'image'))}>
+            <Button
+              className={cn(actionButton)}
+              onClick={() => setMode((m) => (m === 'image' ? 'model' : 'image'))}
+              aria-label={mode === 'image' ? 'View 3D model' : 'View image'}
+            >
               {mode === 'image' ? (
                 <>
-                  <Box className="mr-2 h-4 w-4" aria-hidden />
-                  <span className="max-md:hidden">View 3D Model</span>
-                  <span className="md:hidden">3D</span>
+                  <Box className="h-4 w-4" aria-hidden />
+                  <span className="hidden sm:inline xl:hidden">3D</span>
+                  <span className="hidden xl:inline">View 3D Model</span>
                 </>
               ) : (
                 <>
-                  <ImageIcon className="mr-2 h-4 w-4" aria-hidden />
-                  <span className="max-md:hidden">View Image</span>
-                  <span className="md:hidden">Image</span>
+                  <ImageIcon className="h-4 w-4" aria-hidden />
+                  <span className="hidden sm:inline xl:hidden">Image</span>
+                  <span className="hidden xl:inline">View Image</span>
                 </>
               )}
             </Button>
           )}
-          <Button className={cn(actionButton)} onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" aria-hidden />
-            <span className="max-md:hidden">
-              {mode === 'model' && item.model ? 'Download 3D File' : 'Download Image'}
-            </span>
-            <span className="md:hidden">Download</span>
-          </Button>
+          <div ref={downloadMenuRef} className="relative flex min-w-0">
+            <Button
+              className={cn(downloadButton)}
+              onClick={handleDownloadClick}
+              aria-label="Download"
+              aria-haspopup={hasModel ? 'menu' : undefined}
+              aria-expanded={hasModel ? downloadMenuOpen : undefined}
+            >
+              <Download className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">Download</span>
+              {hasModel && (
+                <ChevronDown
+                  className={cn('h-4 w-4 transition-transform', downloadMenuOpen && 'rotate-180')}
+                  aria-hidden
+                />
+              )}
+            </Button>
+
+            {hasModel && downloadMenuOpen && (
+              <div
+                className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-44 overflow-hidden rounded-md border border-black/15 bg-white py-1 text-sm text-black shadow-lg md:w-52"
+                role="menu"
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-center px-3 py-2 text-left transition-colors hover:bg-black/5 focus-visible:bg-black/5 focus-visible:outline-none"
+                  onClick={() => handleDownloadOption('image')}
+                  role="menuitem"
+                >
+                  <ImageIcon className="mr-2 h-4 w-4" aria-hidden />
+                  Download Image
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center px-3 py-2 text-left transition-colors hover:bg-black/5 focus-visible:bg-black/5 focus-visible:outline-none"
+                  onClick={() => handleDownloadOption('model')}
+                  role="menuitem"
+                >
+                  <Box className="mr-2 h-4 w-4" aria-hidden />
+                  Download 3D File
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
