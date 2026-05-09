@@ -86,6 +86,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function extractText(value: unknown): string {
   if (typeof value === 'string') return value
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value)
   if (!Array.isArray(value)) return ''
 
   return value
@@ -171,8 +172,8 @@ function getTags(page: NotionBlock, collection: NotionCollection | undefined): s
 }
 
 function isPublished(page: NotionBlock, collection: NotionCollection | undefined): boolean {
-  const value = getPropertyText(page, collection, FIELD_NAMES.published).toLowerCase()
-  return value !== 'no' && value !== 'false'
+  const value = getPropertyText(page, collection, FIELD_NAMES.published).trim().toLowerCase()
+  return value === 'true' || value === 'yes' || value === '1'
 }
 
 function getOrder(page: NotionBlock, collection: NotionCollection | undefined): number {
