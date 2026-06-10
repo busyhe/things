@@ -127,15 +127,64 @@ function ParticleLoadingState({ active }: { active: boolean }) {
   )
 }
 
+type ModelStage = {
+  left: number
+  top: number
+  width: number
+  height: number
+  frameScale: number
+}
+
 export function ItemDetail({ item }: Props) {
   const router = useRouter()
   const downloadMenuRef = useRef<HTMLDivElement>(null)
+  const modelAnchorRef = useRef<HTMLDivElement>(null)
   const [loaded, setLoaded] = useState(false)
   const [canHover, setCanHover] = useState(false)
   const [mode, setMode] = useState<'image' | 'model'>('image')
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
+  const [modelStage, setModelStage] = useState<ModelStage | null>(null)
   const hasModel = Boolean(item.model)
   const bypassImageOptimization = shouldBypassImageOptimization(item.image)
+
+  // The model renders at the anchor (the original image spot), but its canvas
+  // is oversized so it covers the whole window: centered on the anchor and
+  // extended until every viewport edge is reached. frameScale compensates the
+  // camera distance so the default model size still matches the anchor box.
+  useEffect(() => {
+    if (!hasModel) return
+    const anchor = modelAnchorRef.current
+    if (!anchor) return
+
+    const update = () => {
+      const rect = anchor.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      const width = 2 * Math.max(cx, vw - cx)
+      const height = 2 * Math.max(cy, vh - cy)
+      setModelStage({
+        left: cx - width / 2,
+        top: cy - height / 2,
+        width,
+        height,
+        frameScale: height / rect.height
+      })
+    }
+
+    update()
+    const resizeObserver = new ResizeObserver(update)
+    resizeObserver.observe(anchor)
+    window.addEventListener('resize', update)
+    document.addEventListener('scroll', update, true)
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', update)
+      document.removeEventListener('scroll', update, true)
+    }
+  }, [hasModel])
 
   useEffect(() => {
     const mq = window.matchMedia('(hover: hover)')
@@ -309,29 +358,52 @@ export function ItemDetail({ item }: Props) {
             onLoad={() => setLoaded(true)}
           />
         </motion.div>
+        {hasModel && (
+          /* Invisible anchor marking the original image-preview spot: the model
+             renders centered here at its normal size. */
+          <div
+            ref={modelAnchorRef}
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-14 mx-auto aspect-square w-[min(100%,500px)] md:inset-y-0 md:my-auto md:w-[min(92%,720px,82vh)] xl:w-[min(92%,820px,84vh)]"
+          />
+        )}
         {hasModel && item.model && (
+          /* Fullscreen stage: the whole window is the 3D interaction/zoom area,
+             while the canvas inside is centered on the anchor so the model sits
+             at the original preview position. */
           <motion.div
-            className="absolute inset-x-0 top-14 mx-auto flex aspect-square w-[min(100%,500px)] items-center justify-center md:inset-y-0 md:my-auto md:w-[min(92%,720px,82vh)] xl:w-[min(92%,820px,84vh)]"
+            className="fixed inset-0 z-0 overflow-hidden"
             initial={{ opacity: 0, scale: 0.88, rotate: 4 }}
             animate={mode === 'model' ? { opacity: 1, scale: 1, rotate: 0 } : { opacity: 0, scale: 0.88, rotate: 4 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             style={{ pointerEvents: mode === 'model' ? 'auto' : 'none' }}
           >
-            {mode === 'model' && (
-              <ModelViewer
-                src={item.model}
-                alt={item.name}
-                poster={item.modelPoster ?? item.image}
-                className="h-full w-full"
-                active
-              />
+            {mode === 'model' && modelStage && (
+              <div
+                className="absolute"
+                style={{
+                  left: modelStage.left,
+                  top: modelStage.top,
+                  width: modelStage.width,
+                  height: modelStage.height
+                }}
+              >
+                <ModelViewer
+                  src={item.model}
+                  alt={item.name}
+                  poster={item.modelPoster ?? item.image}
+                  className="h-full w-full"
+                  frameScale={modelStage.frameScale}
+                  active
+                />
+              </div>
             )}
           </motion.div>
         )}
       </div>
 
-      <div className="flex w-full flex-col justify-center md:w-[42%] md:p-8 xl:w-[38%]">
-        <div className="mb-4 flex flex-wrap gap-2">
+      <div className="pointer-events-none relative z-10 flex w-full flex-col justify-center md:w-[42%] md:p-8 xl:w-[38%]">
+        <div className="pointer-events-auto mb-4 flex flex-wrap gap-2">
           {item.tags.map((tag) => (
             <span
               key={tag}
@@ -346,7 +418,12 @@ export function ItemDetail({ item }: Props) {
 
         <p className="text-base text-black/80 md:text-lg">{item.description}</p>
 
-        <div className={cn('mt-6 grid gap-2 md:mt-8 md:gap-3', hasModel ? 'grid-cols-3' : 'grid-cols-2')}>
+        <div
+          className={cn(
+            'pointer-events-auto mt-6 grid gap-2 md:mt-8 md:gap-3',
+            hasModel ? 'grid-cols-3' : 'grid-cols-2'
+          )}
+        >
           <Button className={cn(actionButton)} onClick={handleClose} aria-label="Back to grid">
             <ArrowLeft className="h-4 w-4" aria-hidden />
             <span className="hidden sm:inline xl:hidden">Back</span>

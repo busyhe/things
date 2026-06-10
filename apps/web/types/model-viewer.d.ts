@@ -13,6 +13,7 @@ type ModelViewerAttributes = {
   'ar-modes'?: string
   'touch-action'?: 'pan-y' | 'pan-x' | 'none'
   'interaction-prompt'?: 'auto' | 'when-focused' | 'none'
+  'interpolation-decay'?: string | number
   'disable-zoom'?: boolean | ''
   'auto-rotate-delay'?: string | number
   'rotation-per-second'?: string

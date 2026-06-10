@@ -13,6 +13,12 @@ type Props = {
    * loop is paused so an off-screen or hidden model doesn't keep burning CPU/GPU.
    */
   active?: boolean
+  /**
+   * Camera distance multiplier (viewer height / anchor height). Lets the canvas
+   * cover a much larger area (e.g. the whole window) while the model still
+   * renders at the size it would have inside the smaller anchor box.
+   */
+  frameScale?: number
 }
 
 export function getModelExtension(url: string): string {
@@ -59,6 +65,7 @@ type ThreeModelViewerProps = {
   extension: ThreeModelExtension
   className?: string
   active?: boolean
+  frameScale?: number
 }
 
 const appleTechGray = 0xaeb4bc
@@ -106,18 +113,25 @@ function disposeObject(object: import('three').Object3D) {
   })
 }
 
-function ThreeModelViewer({ src, alt, extension, className, active = true }: ThreeModelViewerProps) {
+function ThreeModelViewer({ src, alt, extension, className, active = true, frameScale = 1 }: ThreeModelViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   // Live signals the render loop reads to decide whether to keep drawing frames.
   const activeRef = useRef(active)
   const syncPlaybackRef = useRef<(() => void) | null>(null)
+  const frameScaleRef = useRef(Math.max(frameScale, 1))
+  const reframeRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     activeRef.current = active
     syncPlaybackRef.current?.()
   }, [active])
+
+  useEffect(() => {
+    frameScaleRef.current = Math.max(frameScale, 1)
+    reframeRef.current?.()
+  }, [frameScale])
 
   useEffect(() => {
     const container = containerRef.current
@@ -181,6 +195,18 @@ function ThreeModelViewer({ src, alt, extension, className, active = true }: Thr
         let rotating = false
         let initialCameraPosition: import('three').Vector3 | undefined
         let initialTarget: import('three').Vector3 | undefined
+        let modelRadius = 0.1
+        let appliedFrameScale = 1
+        let cameraTween:
+          | {
+              fromPosition: import('three').Vector3
+              fromTarget: import('three').Vector3
+              toPosition: import('three').Vector3
+              toTarget: import('three').Vector3
+              start: number
+              duration: number
+            }
+          | undefined
 
         const resize = () => {
           const width = container.clientWidth
@@ -204,34 +230,89 @@ function ThreeModelViewer({ src, alt, extension, className, active = true }: Thr
           object.position.sub(center)
 
           const radius = Math.max(size.length() * 0.5, 0.1)
-          const distance = radius * 3.1
+          modelRadius = radius
+          appliedFrameScale = frameScaleRef.current
+          const distance = radius * 3.1 * appliedFrameScale
 
           camera.position.set(distance, distance * 0.8, distance)
           camera.near = Math.max(radius / 100, 0.01)
-          camera.far = radius * 100
+          camera.far = radius * 120 * appliedFrameScale
           camera.updateProjectionMatrix()
           controls.target.set(0, 0, 0)
           controls.minDistance = radius * 0.7
-          controls.maxDistance = radius * 8
+          controls.maxDistance = radius * 8 * appliedFrameScale
           controls.update()
           initialCameraPosition = camera.position.clone()
           initialTarget = controls.target.clone()
           resize()
         }
 
-        const resetZoom = () => {
+        const isAtDefaultView = () => {
+          if (!initialCameraPosition || !initialTarget) return true
+          const initialDistance = initialCameraPosition.distanceTo(initialTarget)
+          return (
+            Math.abs(camera.position.distanceTo(controls.target) - initialDistance) < initialDistance * 0.1 &&
+            controls.target.distanceTo(initialTarget) < modelRadius * 0.05
+          )
+        }
+
+        // Re-derive the "normal size" framing when the anchor/viewport ratio
+        // changes (e.g. window resize) without rebuilding the scene.
+        const reframe = () => {
+          const nextScale = frameScaleRef.current
+          if (!initialCameraPosition || !initialTarget || nextScale === appliedFrameScale) return
+          const wasDefault = isAtDefaultView()
+          const ratio = nextScale / appliedFrameScale
+          initialCameraPosition = initialTarget
+            .clone()
+            .add(initialCameraPosition.clone().sub(initialTarget).multiplyScalar(ratio))
+          appliedFrameScale = nextScale
+          controls.maxDistance = modelRadius * 8 * nextScale
+          camera.far = modelRadius * 120 * nextScale
+          camera.updateProjectionMatrix()
+          if (wasDefault) {
+            cameraTween = undefined
+            camera.position.copy(initialCameraPosition)
+            controls.target.copy(initialTarget)
+            controls.update()
+          }
+        }
+        reframeRef.current = reframe
+
+        const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+
+        const animateCameraTo = (toPosition: import('three').Vector3, toTarget: import('three').Vector3) => {
+          cameraTween = {
+            fromPosition: camera.position.clone(),
+            fromTarget: controls.target.clone(),
+            toPosition,
+            toTarget,
+            start: performance.now(),
+            duration: 450
+          }
+        }
+
+        // Double-click adaptively toggles the view: from the fitted "normal"
+        // view it zooms in for a closer look; from any zoomed/offset state it
+        // smoothly restores the fitted view.
+        const toggleZoom = () => {
           if (!initialCameraPosition || !initialTarget) return
 
+          const initialDistance = initialCameraPosition.distanceTo(initialTarget)
           const direction = camera.position.clone().sub(controls.target).normalize()
           if (direction.lengthSq() === 0) {
             direction.copy(initialCameraPosition).sub(initialTarget).normalize()
           }
 
-          camera.position
-            .copy(initialTarget)
-            .add(direction.multiplyScalar(initialCameraPosition.distanceTo(initialTarget)))
-          controls.target.copy(initialTarget)
-          controls.update()
+          // When the canvas is much larger than the anchor (fullscreen stage),
+          // zoom in until the model roughly fills the window; otherwise use the
+          // classic 0.55x close-up.
+          const zoomFactor = appliedFrameScale > 1.05 ? 0.7 / appliedFrameScale : 0.55
+          const nextDistance = isAtDefaultView()
+            ? Math.min(Math.max(initialDistance * zoomFactor, controls.minDistance), controls.maxDistance)
+            : initialDistance
+
+          animateCameraTo(initialTarget.clone().add(direction.multiplyScalar(nextDistance)), initialTarget.clone())
         }
 
         const applyAppleTechGray = (object: import('three').Object3D) => {
@@ -306,6 +387,13 @@ function ThreeModelViewer({ src, alt, extension, className, active = true }: Thr
 
         const renderFrame = () => {
           if (rotating) pivot.rotation.y += autoRotateSpeed
+          if (cameraTween) {
+            const t = Math.min((performance.now() - cameraTween.start) / cameraTween.duration, 1)
+            const eased = easeInOutCubic(t)
+            camera.position.lerpVectors(cameraTween.fromPosition, cameraTween.toPosition, eased)
+            controls.target.lerpVectors(cameraTween.fromTarget, cameraTween.toTarget, eased)
+            if (t >= 1) cameraTween = undefined
+          }
           controls.update()
           renderer.render(scene, camera)
         }
@@ -345,14 +433,24 @@ function ThreeModelViewer({ src, alt, extension, className, active = true }: Thr
 
         animate()
 
-        renderer.domElement.addEventListener('dblclick', resetZoom)
+        // User input takes over immediately: cancel any in-flight camera animation.
+        const cancelTween = () => {
+          cameraTween = undefined
+        }
+
+        renderer.domElement.addEventListener('dblclick', toggleZoom)
+        renderer.domElement.addEventListener('pointerdown', cancelTween)
+        renderer.domElement.addEventListener('wheel', cancelTween, { passive: true })
 
         cleanup = () => {
           if (animationFrame) window.cancelAnimationFrame(animationFrame)
           syncPlaybackRef.current = null
+          reframeRef.current = null
           document.removeEventListener('visibilitychange', handleVisibilityChange)
           intersectionObserver.disconnect()
-          renderer.domElement.removeEventListener('dblclick', resetZoom)
+          renderer.domElement.removeEventListener('dblclick', toggleZoom)
+          renderer.domElement.removeEventListener('pointerdown', cancelTween)
+          renderer.domElement.removeEventListener('wheel', cancelTween)
           resizeObserver.disconnect()
           controls.dispose()
           if (loadedObject) disposeObject(loadedObject)
@@ -392,13 +490,16 @@ function ThreeModelViewer({ src, alt, extension, className, active = true }: Thr
   )
 }
 
-export function ModelViewer({ src, alt, poster, className, active = true }: Props) {
+export function ModelViewer({ src, alt, poster, className, active = true, frameScale = 1 }: Props) {
   const ext = getModelExtension(src)
   const isWebNative = ext === 'glb' || ext === 'gltf'
   const isThreeRenderable = ext === 'stl' || ext === '3mf'
   const [registered, setRegistered] = useState(false)
   const nativeViewerRef = useRef<NativeModelViewerElement | null>(null)
   const nativeInitialCameraRef = useRef<NativeCameraState | null>(null)
+  // Radius model-viewer picked to frame the model in the (possibly oversized)
+  // element — the "fills the canvas" distance, recorded once per src.
+  const nativeBaseRef = useRef<{ src: string; radius: number } | null>(null)
 
   useEffect(() => {
     if (!isWebNative) return
@@ -420,37 +521,75 @@ export function ModelViewer({ src, alt, poster, className, active = true }: Prop
     const viewer = nativeViewerRef.current
     if (!viewer) return
 
-    const storeInitialCamera = () => {
+    // Scale the framing radius so the model renders at the anchor-box size even
+    // though the element itself may cover the whole window.
+    const applyFraming = () => {
       const orbit = viewer.getCameraOrbit?.()
       if (!orbit) return
 
+      if (nativeBaseRef.current?.src !== src) {
+        nativeBaseRef.current = { src, radius: orbit.radius }
+      }
+
+      const scale = Math.max(frameScale, 1)
+      const previous = nativeInitialCameraRef.current
+      const radius = nativeBaseRef.current.radius * scale
+
       nativeInitialCameraRef.current = {
-        radius: orbit.radius,
-        target: viewer.cameraTarget || defaultNativeCameraTarget,
-        fieldOfView: viewer.fieldOfView || defaultNativeFieldOfView
+        radius,
+        target: previous?.target ?? (viewer.cameraTarget || defaultNativeCameraTarget),
+        fieldOfView: previous?.fieldOfView ?? (viewer.fieldOfView || defaultNativeFieldOfView)
+      }
+      viewer.setAttribute('min-camera-orbit', `auto auto ${nativeBaseRef.current.radius * 0.4}m`)
+      viewer.setAttribute('max-camera-orbit', `auto auto ${radius * 4}m`)
+
+      // Snap to the new normal view unless the user has already zoomed away.
+      const atDefault = !previous || Math.abs(orbit.radius - previous.radius) < previous.radius * 0.1
+      if (atDefault) {
+        viewer.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${radius}m`
+        viewer.jumpCameraToGoal?.()
       }
     }
 
-    viewer.addEventListener('load', storeInitialCamera)
-    if (viewer.loaded) storeInitialCamera()
+    viewer.addEventListener('load', applyFraming)
+    if (viewer.loaded) applyFraming()
 
-    return () => viewer.removeEventListener('load', storeInitialCamera)
-  }, [isWebNative, registered, src])
+    return () => viewer.removeEventListener('load', applyFraming)
+  }, [isWebNative, registered, src, frameScale])
 
-  const resetNativeZoom = useCallback(() => {
+  // Double-click adaptively toggles the view: from the default framing it zooms
+  // in for a closer look; from any zoomed state it restores the normal size.
+  // Camera changes are interpolated by model-viewer, so the move is smooth.
+  const toggleNativeZoom = useCallback(() => {
     const viewer = nativeViewerRef.current
     const initialCamera = nativeInitialCameraRef.current
     const currentOrbit = viewer?.getCameraOrbit?.()
     if (!viewer || !initialCamera || !currentOrbit) return
 
-    viewer.cameraOrbit = `${currentOrbit.theta}rad ${currentOrbit.phi}rad ${initialCamera.radius}m`
+    const atDefaultView = Math.abs(currentOrbit.radius - initialCamera.radius) < initialCamera.radius * 0.1
+    // Fullscreen stage: zoom toward the element-filling (window-filling) radius;
+    // plain usage: classic 0.55x close-up.
+    const base = nativeBaseRef.current?.radius ?? initialCamera.radius
+    const scale = initialCamera.radius / base
+    const zoomRadius = scale > 1.05 ? base * 0.7 : initialCamera.radius * 0.55
+    const nextRadius = atDefaultView ? zoomRadius : initialCamera.radius
+
+    viewer.cameraOrbit = `${currentOrbit.theta}rad ${currentOrbit.phi}rad ${nextRadius}m`
     viewer.cameraTarget = initialCamera.target
     viewer.fieldOfView = initialCamera.fieldOfView
-    viewer.jumpCameraToGoal?.()
   }, [])
 
   if (isThreeRenderable) {
-    return <ThreeModelViewer src={src} alt={alt} extension={ext} className={className} active={active} />
+    return (
+      <ThreeModelViewer
+        src={src}
+        alt={alt}
+        extension={ext}
+        className={className}
+        active={active}
+        frameScale={frameScale}
+      />
+    )
   }
 
   if (!isWebNative) {
@@ -493,7 +632,8 @@ export function ModelViewer({ src, alt, poster, className, active = true }: Prop
       shadow-intensity="1"
       exposure="1"
       touch-action="pan-y"
-      onDoubleClick={resetNativeZoom}
+      interpolation-decay="160"
+      onDoubleClick={toggleNativeZoom}
       className={cn('block h-full w-full bg-transparent', className)}
     />
   )
