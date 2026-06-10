@@ -1,7 +1,7 @@
 'use client'
 
 import ThiingsGrid, { type ItemConfig } from '@/components/ThiingsGrid'
-import { getThiingsItemByGridIndex, isNotionHostedResource, type ThiingsItem } from '@/lib/thiings'
+import { getThiingsItemByGridIndex, shouldBypassImageOptimization, type ThiingsItem } from '@/lib/thiings'
 import { motion } from 'motion/react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -23,13 +23,13 @@ function GridItem({ item, onNavigate }: { item: ThiingsItem; onNavigate: (id: st
     >
       <Image
         draggable={false}
-        priority
         className="h-full w-full object-contain transition-transform active:scale-95 md:group-hover:scale-110"
         src={item.image}
         alt={item.name}
         width={160}
         height={160}
-        unoptimized={isNotionHostedResource(item.image)}
+        sizes="160px"
+        unoptimized={shouldBypassImageOptimization(item.image)}
         onLoad={() => setLoaded(true)}
       />
     </motion.div>

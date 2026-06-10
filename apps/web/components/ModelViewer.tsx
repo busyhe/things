@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@workspace/ui/lib/utils'
 
 type Props = {
@@ -8,6 +8,11 @@ type Props = {
   alt: string
   poster?: string
   className?: string
+  /**
+   * Whether the viewer is the active/visible view. When false the WebGL render
+   * loop is paused so an off-screen or hidden model doesn't keep burning CPU/GPU.
+   */
+  active?: boolean
 }
 
 export function getModelExtension(url: string): string {
@@ -53,10 +58,29 @@ type ThreeModelViewerProps = {
   alt: string
   extension: ThreeModelExtension
   className?: string
+  active?: boolean
 }
 
 const appleTechGray = 0xaeb4bc
 const autoRotateSpeed = 0.001
+const defaultNativeCameraTarget = 'auto auto auto'
+const defaultNativeFieldOfView = 'auto'
+
+type NativeCameraState = {
+  radius: number
+  target: string
+  fieldOfView: string
+}
+
+type NativeModelViewerElement = HTMLElement & {
+  cameraOrbit: string
+  cameraTarget: string
+  fieldOfView: string
+  loaded: boolean
+  getCameraOrbit?: () => { theta: number; phi: number; radius: number }
+  getFieldOfView?: () => number
+  jumpCameraToGoal?: () => void
+}
 
 function createDefaultMaterial(THREE: typeof import('three')) {
   return new THREE.MeshStandardMaterial({
@@ -82,9 +106,18 @@ function disposeObject(object: import('three').Object3D) {
   })
 }
 
-function ThreeModelViewer({ src, alt, extension, className }: ThreeModelViewerProps) {
+function ThreeModelViewer({ src, alt, extension, className, active = true }: ThreeModelViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+
+  // Live signals the render loop reads to decide whether to keep drawing frames.
+  const activeRef = useRef(active)
+  const syncPlaybackRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    activeRef.current = active
+    syncPlaybackRef.current?.()
+  }, [active])
 
   useEffect(() => {
     const container = containerRef.current
@@ -146,6 +179,8 @@ function ThreeModelViewer({ src, alt, extension, className }: ThreeModelViewerPr
         scene.add(pivot)
         let loadedObject: import('three').Object3D | undefined
         let rotating = false
+        let initialCameraPosition: import('three').Vector3 | undefined
+        let initialTarget: import('three').Vector3 | undefined
 
         const resize = () => {
           const width = container.clientWidth
@@ -179,7 +214,24 @@ function ThreeModelViewer({ src, alt, extension, className }: ThreeModelViewerPr
           controls.minDistance = radius * 0.7
           controls.maxDistance = radius * 8
           controls.update()
+          initialCameraPosition = camera.position.clone()
+          initialTarget = controls.target.clone()
           resize()
+        }
+
+        const resetZoom = () => {
+          if (!initialCameraPosition || !initialTarget) return
+
+          const direction = camera.position.clone().sub(controls.target).normalize()
+          if (direction.lengthSq() === 0) {
+            direction.copy(initialCameraPosition).sub(initialTarget).normalize()
+          }
+
+          camera.position
+            .copy(initialTarget)
+            .add(direction.multiplyScalar(initialCameraPosition.distanceTo(initialTarget)))
+          controls.target.copy(initialTarget)
+          controls.update()
         }
 
         const applyAppleTechGray = (object: import('three').Object3D) => {
@@ -244,16 +296,63 @@ function ThreeModelViewer({ src, alt, extension, className }: ThreeModelViewerPr
           )
         }
 
-        const animate = () => {
+        let intersecting = true
+
+        // Only keep the WebGL loop alive while the viewer is actually on screen,
+        // the tab is visible, and the parent marks it as the active view.
+        // Otherwise an off-screen/hidden model keeps pegging the CPU/GPU.
+        const shouldPlay = () =>
+          !cancelled && intersecting && activeRef.current && document.visibilityState !== 'hidden'
+
+        const renderFrame = () => {
           if (rotating) pivot.rotation.y += autoRotateSpeed
           controls.update()
           renderer.render(scene, camera)
-          animationFrame = window.requestAnimationFrame(animate)
         }
+
+        const animate = () => {
+          renderFrame()
+          if (shouldPlay()) {
+            animationFrame = window.requestAnimationFrame(animate)
+          } else {
+            animationFrame = 0
+          }
+        }
+
+        const syncPlayback = () => {
+          if (shouldPlay()) {
+            if (!animationFrame) animationFrame = window.requestAnimationFrame(animate)
+          } else if (animationFrame) {
+            window.cancelAnimationFrame(animationFrame)
+            animationFrame = 0
+          }
+        }
+        syncPlaybackRef.current = syncPlayback
+
+        const handleVisibilityChange = () => syncPlayback()
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+
+        const intersectionObserver = new IntersectionObserver(
+          (entries) => {
+            const entry = entries[0]
+            if (!entry) return
+            intersecting = entry.isIntersecting
+            syncPlayback()
+          },
+          { threshold: 0 }
+        )
+        intersectionObserver.observe(container)
+
         animate()
 
+        renderer.domElement.addEventListener('dblclick', resetZoom)
+
         cleanup = () => {
-          window.cancelAnimationFrame(animationFrame)
+          if (animationFrame) window.cancelAnimationFrame(animationFrame)
+          syncPlaybackRef.current = null
+          document.removeEventListener('visibilitychange', handleVisibilityChange)
+          intersectionObserver.disconnect()
+          renderer.domElement.removeEventListener('dblclick', resetZoom)
           resizeObserver.disconnect()
           controls.dispose()
           if (loadedObject) disposeObject(loadedObject)
@@ -293,11 +392,13 @@ function ThreeModelViewer({ src, alt, extension, className }: ThreeModelViewerPr
   )
 }
 
-export function ModelViewer({ src, alt, poster, className }: Props) {
+export function ModelViewer({ src, alt, poster, className, active = true }: Props) {
   const ext = getModelExtension(src)
   const isWebNative = ext === 'glb' || ext === 'gltf'
   const isThreeRenderable = ext === 'stl' || ext === '3mf'
   const [registered, setRegistered] = useState(false)
+  const nativeViewerRef = useRef<NativeModelViewerElement | null>(null)
+  const nativeInitialCameraRef = useRef<NativeCameraState | null>(null)
 
   useEffect(() => {
     if (!isWebNative) return
@@ -310,8 +411,46 @@ export function ModelViewer({ src, alt, poster, className }: Props) {
     }
   }, [isWebNative])
 
+  useEffect(() => {
+    if (!isWebNative || !registered) {
+      nativeInitialCameraRef.current = null
+      return
+    }
+
+    const viewer = nativeViewerRef.current
+    if (!viewer) return
+
+    const storeInitialCamera = () => {
+      const orbit = viewer.getCameraOrbit?.()
+      if (!orbit) return
+
+      nativeInitialCameraRef.current = {
+        radius: orbit.radius,
+        target: viewer.cameraTarget || defaultNativeCameraTarget,
+        fieldOfView: viewer.fieldOfView || defaultNativeFieldOfView
+      }
+    }
+
+    viewer.addEventListener('load', storeInitialCamera)
+    if (viewer.loaded) storeInitialCamera()
+
+    return () => viewer.removeEventListener('load', storeInitialCamera)
+  }, [isWebNative, registered, src])
+
+  const resetNativeZoom = useCallback(() => {
+    const viewer = nativeViewerRef.current
+    const initialCamera = nativeInitialCameraRef.current
+    const currentOrbit = viewer?.getCameraOrbit?.()
+    if (!viewer || !initialCamera || !currentOrbit) return
+
+    viewer.cameraOrbit = `${currentOrbit.theta}rad ${currentOrbit.phi}rad ${initialCamera.radius}m`
+    viewer.cameraTarget = initialCamera.target
+    viewer.fieldOfView = initialCamera.fieldOfView
+    viewer.jumpCameraToGoal?.()
+  }, [])
+
   if (isThreeRenderable) {
-    return <ThreeModelViewer src={src} alt={alt} extension={ext} className={className} />
+    return <ThreeModelViewer src={src} alt={alt} extension={ext} className={className} active={active} />
   }
 
   if (!isWebNative) {
@@ -343,14 +482,18 @@ export function ModelViewer({ src, alt, poster, className }: Props) {
 
   return (
     <model-viewer
+      ref={(element) => {
+        nativeViewerRef.current = element as NativeModelViewerElement | null
+      }}
       src={src}
       alt={alt}
       poster={poster}
       camera-controls
-      auto-rotate
+      {...(active ? { 'auto-rotate': true } : {})}
       shadow-intensity="1"
       exposure="1"
       touch-action="pan-y"
+      onDoubleClick={resetNativeZoom}
       className={cn('block h-full w-full bg-transparent', className)}
     />
   )

@@ -32,6 +32,18 @@ export function isNotionHostedResource(url: string | undefined): boolean {
   }
 }
 
+export function shouldBypassImageOptimization(url: string | undefined): boolean {
+  if (!url) return false
+  if (isNotionHostedResource(url)) return true
+
+  try {
+    const parsed = new URL(url)
+    return parsed.hostname.toLowerCase() === 'models.busyhe.com'
+  } catch {
+    return false
+  }
+}
+
 export function getThiingsItemByGridIndex(items: ThiingsItem[], gridIndex: number): ThiingsItem {
   const len = items.length
   const idx = ((gridIndex % len) + len) % len
