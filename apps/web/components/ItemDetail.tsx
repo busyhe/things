@@ -144,7 +144,14 @@ export function ItemDetail({ item }: Props) {
   const [mode, setMode] = useState<'image' | 'model'>('image')
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
   const [modelStage, setModelStage] = useState<ModelStage | null>(null)
+  // Once the 3D view has been opened we keep the viewer mounted (just paused
+  // via `active`) so toggling back and forth doesn't reload the model.
+  const [modelMounted, setModelMounted] = useState(false)
   const hasModel = Boolean(item.model)
+
+  useEffect(() => {
+    if (mode === 'model') setModelMounted(true)
+  }, [mode])
   const bypassImageOptimization = shouldBypassImageOptimization(item.image)
 
   // The model renders at the anchor (the original image spot), but its canvas
@@ -378,7 +385,7 @@ export function ItemDetail({ item }: Props) {
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             style={{ pointerEvents: mode === 'model' ? 'auto' : 'none' }}
           >
-            {mode === 'model' && modelStage && (
+            {modelMounted && modelStage && (
               <div
                 className="absolute"
                 style={{
@@ -394,7 +401,7 @@ export function ItemDetail({ item }: Props) {
                   poster={item.modelPoster ?? item.image}
                   className="h-full w-full"
                   frameScale={modelStage.frameScale}
-                  active
+                  active={mode === 'model'}
                 />
               </div>
             )}

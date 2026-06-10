@@ -119,13 +119,20 @@ function ThreeModelViewer({ src, alt, extension, className, active = true, frame
 
   // Live signals the render loop reads to decide whether to keep drawing frames.
   const activeRef = useRef(active)
+  const prevActiveRef = useRef(active)
   const syncPlaybackRef = useRef<(() => void) | null>(null)
   const frameScaleRef = useRef(Math.max(frameScale, 1))
   const reframeRef = useRef<(() => void) | null>(null)
+  const resetViewRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
+    const wasActive = prevActiveRef.current
+    prevActiveRef.current = active
     activeRef.current = active
     syncPlaybackRef.current?.()
+    // Re-entering the 3D view restores the default framing so the model shows
+    // at its original size instead of whatever zoom the user left behind.
+    if (active && !wasActive) resetViewRef.current?.()
   }, [active])
 
   useEffect(() => {
@@ -278,6 +285,23 @@ function ThreeModelViewer({ src, alt, extension, className, active = true, frame
           }
         }
         reframeRef.current = reframe
+
+        // Instantly restore the fitted "normal size" view (keeping the current
+        // viewing direction). Used when the viewer becomes active again.
+        const resetView = () => {
+          if (!initialCameraPosition || !initialTarget) return
+          cameraTween = undefined
+          const initialDistance = initialCameraPosition.distanceTo(initialTarget)
+          const direction = camera.position.clone().sub(controls.target).normalize()
+          if (direction.lengthSq() === 0) {
+            direction.copy(initialCameraPosition).sub(initialTarget).normalize()
+          }
+          camera.position.copy(initialTarget.clone().add(direction.multiplyScalar(initialDistance)))
+          controls.target.copy(initialTarget)
+          controls.update()
+          renderFrame()
+        }
+        resetViewRef.current = resetView
 
         const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
@@ -446,6 +470,7 @@ function ThreeModelViewer({ src, alt, extension, className, active = true, frame
           if (animationFrame) window.cancelAnimationFrame(animationFrame)
           syncPlaybackRef.current = null
           reframeRef.current = null
+          resetViewRef.current = null
           document.removeEventListener('visibilitychange', handleVisibilityChange)
           intersectionObserver.disconnect()
           renderer.domElement.removeEventListener('dblclick', toggleZoom)
@@ -500,6 +525,23 @@ export function ModelViewer({ src, alt, poster, className, active = true, frameS
   // Radius model-viewer picked to frame the model in the (possibly oversized)
   // element — the "fills the canvas" distance, recorded once per src.
   const nativeBaseRef = useRef<{ src: string; radius: number } | null>(null)
+  const prevActiveRef = useRef(active)
+
+  // Re-entering the 3D view restores the default framing so the model shows at
+  // its original size instead of whatever zoom the user left behind.
+  useEffect(() => {
+    const wasActive = prevActiveRef.current
+    prevActiveRef.current = active
+    if (!active || wasActive || !isWebNative) return
+    const viewer = nativeViewerRef.current
+    const initialCamera = nativeInitialCameraRef.current
+    const orbit = viewer?.getCameraOrbit?.()
+    if (!viewer || !initialCamera || !orbit) return
+    viewer.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${initialCamera.radius}m`
+    viewer.cameraTarget = initialCamera.target
+    viewer.fieldOfView = initialCamera.fieldOfView
+    viewer.jumpCameraToGoal?.()
+  }, [active, isWebNative])
 
   useEffect(() => {
     if (!isWebNative) return
