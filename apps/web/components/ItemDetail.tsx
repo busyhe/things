@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Box, ChevronDown, Download, Flag, ImageIcon, Share2, Volume2, X } from 'lucide-react'
@@ -9,6 +9,7 @@ import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { shouldBypassImageOptimization, type ThiingsItem } from '@/lib/thiings'
 import { ModelViewer, getModelExtension } from '@/components/ModelViewer'
+import { ParticleField } from '@/components/ParticleField'
 
 type Props = {
   item: ThiingsItem
@@ -24,108 +25,6 @@ const downloadButton =
   'h-9 w-full min-w-0 rounded-full bg-black px-2 py-2 text-xs text-white shadow transition-colors hover:bg-gray-800 sm:px-3 sm:text-sm xl:px-4'
 
 type DownloadTarget = 'image' | 'model'
-
-const particleSpecs = [
-  { x: -116, y: -102, size: 6, delay: 0, duration: 2.6, color: 'rgba(0,0,0,0.34)', opacity: 0.75 },
-  { x: -72, y: -136, size: 4, delay: 0.18, duration: 2.9, color: 'rgba(241,126,88,0.52)', opacity: 0.7 },
-  { x: -18, y: -122, size: 7, delay: 0.36, duration: 2.5, color: 'rgba(51,108,138,0.48)', opacity: 0.68 },
-  { x: 46, y: -142, size: 5, delay: 0.08, duration: 3.1, color: 'rgba(0,0,0,0.28)', opacity: 0.62 },
-  { x: 106, y: -100, size: 8, delay: 0.24, duration: 2.7, color: 'rgba(236,188,82,0.58)', opacity: 0.76 },
-  { x: 142, y: -44, size: 4, delay: 0.42, duration: 2.4, color: 'rgba(0,0,0,0.3)', opacity: 0.62 },
-  { x: 124, y: 18, size: 6, delay: 0.12, duration: 2.8, color: 'rgba(51,108,138,0.52)', opacity: 0.7 },
-  { x: 94, y: 92, size: 5, delay: 0.3, duration: 2.6, color: 'rgba(241,126,88,0.5)', opacity: 0.64 },
-  { x: 28, y: 130, size: 8, delay: 0.48, duration: 3, color: 'rgba(0,0,0,0.26)', opacity: 0.58 },
-  { x: -38, y: 144, size: 4, delay: 0.16, duration: 2.5, color: 'rgba(236,188,82,0.56)', opacity: 0.68 },
-  { x: -112, y: 98, size: 7, delay: 0.34, duration: 2.9, color: 'rgba(51,108,138,0.46)', opacity: 0.62 },
-  { x: -146, y: 30, size: 5, delay: 0.06, duration: 2.7, color: 'rgba(0,0,0,0.3)', opacity: 0.65 },
-  { x: -132, y: -34, size: 9, delay: 0.22, duration: 3.2, color: 'rgba(241,126,88,0.46)', opacity: 0.7 },
-  { x: -52, y: -58, size: 3, delay: 0.4, duration: 2.3, color: 'rgba(0,0,0,0.44)', opacity: 0.75 },
-  { x: 20, y: -52, size: 5, delay: 0.14, duration: 2.5, color: 'rgba(236,188,82,0.62)', opacity: 0.72 },
-  { x: 58, y: -8, size: 3, delay: 0.32, duration: 2.8, color: 'rgba(0,0,0,0.42)', opacity: 0.7 },
-  { x: 42, y: 58, size: 6, delay: 0.1, duration: 2.6, color: 'rgba(51,108,138,0.48)', opacity: 0.68 },
-  { x: -26, y: 70, size: 4, delay: 0.28, duration: 2.4, color: 'rgba(241,126,88,0.5)', opacity: 0.64 },
-  { x: -78, y: 26, size: 5, delay: 0.46, duration: 3.1, color: 'rgba(0,0,0,0.32)', opacity: 0.66 },
-  { x: 78, y: -76, size: 4, delay: 0.2, duration: 2.9, color: 'rgba(236,188,82,0.5)', opacity: 0.68 }
-] as const
-
-function ParticleLoadingState({ active }: { active: boolean }) {
-  const reduceMotion = useReducedMotion()
-
-  return (
-    <AnimatePresence initial={false}>
-      {active && (
-        <motion.div
-          key="particle-loading"
-          className="pointer-events-none absolute inset-x-0 top-14 z-0 mx-auto flex aspect-square w-[min(100%,500px)] items-center justify-center overflow-hidden rounded-full md:inset-y-0 md:my-auto"
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{
-            opacity: 0,
-            scale: reduceMotion ? 1 : 1.08,
-            filter: reduceMotion ? 'blur(0px)' : 'blur(5px)'
-          }}
-          transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-          role="status"
-          aria-live="polite"
-        >
-          <span className="sr-only">Loading item</span>
-          <motion.span
-            className="absolute h-24 w-24 rounded-full border border-black/10"
-            animate={reduceMotion ? { opacity: 0.55 } : { opacity: [0.25, 0.72, 0.25], scale: [0.82, 1.38, 0.82] }}
-            transition={reduceMotion ? { duration: 0.2 } : { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.span
-            className="absolute h-12 w-12 rounded-full bg-black/[0.06] blur-sm"
-            animate={reduceMotion ? { opacity: 0.58 } : { opacity: [0.42, 0.75, 0.42], scale: [0.9, 1.14, 0.9] }}
-            transition={reduceMotion ? { duration: 0.2 } : { duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          {particleSpecs.map((particle, index) => (
-            <motion.span
-              key={`${particle.x}-${particle.y}-${index}`}
-              className="absolute left-1/2 top-1/2 rounded-full shadow-[0_0_20px_rgba(0,0,0,0.08)] will-change-transform"
-              style={{
-                width: particle.size,
-                height: particle.size,
-                backgroundColor: particle.color
-              }}
-              initial={{
-                x: particle.x * 0.72,
-                y: particle.y * 0.72,
-                opacity: 0,
-                scale: 0.5
-              }}
-              animate={
-                reduceMotion
-                  ? {
-                      x: particle.x,
-                      y: particle.y,
-                      opacity: particle.opacity * 0.7,
-                      scale: 1
-                    }
-                  : {
-                      x: [particle.x * 0.72, particle.x * 1.04, particle.x * 0.86],
-                      y: [particle.y * 0.72, particle.y * 1.04, particle.y * 0.86],
-                      opacity: [0.18, particle.opacity, 0.18],
-                      scale: [0.7, 1.35, 0.82]
-                    }
-              }
-              transition={
-                reduceMotion
-                  ? { duration: 0.2 }
-                  : {
-                      duration: particle.duration,
-                      delay: particle.delay,
-                      repeat: Infinity,
-                      ease: 'easeInOut'
-                    }
-              }
-            />
-          ))}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
-}
 
 type ModelStage = {
   left: number
@@ -338,7 +237,11 @@ export function ItemDetail({ item }: Props) {
       </div>
 
       <div className="relative mb-6 flex w-full items-center justify-center pt-14 md:mb-0 md:h-full md:min-h-[200px] md:w-[58%] md:pt-0 xl:w-[62%]">
-        <ParticleLoadingState active={!loaded && mode === 'image'} />
+        <ParticleField
+          active={!loaded && mode === 'image'}
+          label="Loading image"
+          className="absolute inset-x-0 top-14 z-0 mx-auto aspect-square w-[min(100%,500px)] overflow-hidden md:inset-y-0 md:my-auto"
+        />
         <motion.div
           className="relative z-10 mx-auto aspect-square w-[min(100%,500px)]"
           initial={{ opacity: 0, scale: 0.85, rotate: -4 }}

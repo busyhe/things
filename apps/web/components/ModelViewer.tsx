@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@workspace/ui/lib/utils'
+import { ParticleField } from '@/components/ParticleField'
 
 type Props = {
   src: string
@@ -500,15 +501,13 @@ function ThreeModelViewer({ src, alt, extension, className, active = true, frame
       role="img"
       aria-label={alt}
     >
-      {status !== 'ready' && (
+      <ParticleField active={status === 'loading'} label="Loading 3D model" className="absolute inset-0 z-10" />
+      {status === 'error' && (
         <div
-          className={cn(
-            'absolute inset-0 flex items-center justify-center text-center text-sm text-black/40',
-            status === 'error' && 'p-6 text-black/60'
-          )}
+          className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-black/60"
           role="status"
         >
-          {status === 'error' ? 'Unable to load 3D model' : 'Loading 3D viewer...'}
+          Unable to load 3D model
         </div>
       )}
     </div>
@@ -520,6 +519,7 @@ export function ModelViewer({ src, alt, poster, className, active = true, frameS
   const isWebNative = ext === 'glb' || ext === 'gltf'
   const isThreeRenderable = ext === 'stl' || ext === '3mf'
   const [registered, setRegistered] = useState(false)
+  const [nativeLoaded, setNativeLoaded] = useState(false)
   const nativeViewerRef = useRef<NativeModelViewerElement | null>(null)
   const nativeInitialCameraRef = useRef<NativeCameraState | null>(null)
   // Radius model-viewer picked to frame the model in the (possibly oversized)
@@ -553,6 +553,11 @@ export function ModelViewer({ src, alt, poster, className, active = true, frameS
       cancelled = true
     }
   }, [isWebNative])
+
+  // A new model means a fresh load: show the particle loader until it fires `load`.
+  useEffect(() => {
+    setNativeLoaded(false)
+  }, [src])
 
   useEffect(() => {
     if (!isWebNative || !registered) {
@@ -593,10 +598,14 @@ export function ModelViewer({ src, alt, poster, className, active = true, frameS
       }
     }
 
-    viewer.addEventListener('load', applyFraming)
-    if (viewer.loaded) applyFraming()
+    const onLoad = () => {
+      setNativeLoaded(true)
+      applyFraming()
+    }
+    viewer.addEventListener('load', onLoad)
+    if (viewer.loaded) onLoad()
 
-    return () => viewer.removeEventListener('load', applyFraming)
+    return () => viewer.removeEventListener('load', onLoad)
   }, [isWebNative, registered, src, frameScale])
 
   // Double-click adaptively toggles the view: from the default framing it zooms
@@ -653,30 +662,27 @@ export function ModelViewer({ src, alt, poster, className, active = true, frameS
     )
   }
 
-  if (!registered) {
-    return (
-      <div className={cn('flex h-full w-full items-center justify-center text-black/40', className)} role="status">
-        <span className="text-sm">Loading 3D viewer...</span>
-      </div>
-    )
-  }
-
   return (
-    <model-viewer
-      ref={(element) => {
-        nativeViewerRef.current = element as NativeModelViewerElement | null
-      }}
-      src={src}
-      alt={alt}
-      poster={poster}
-      camera-controls
-      {...(active ? { 'auto-rotate': true } : {})}
-      shadow-intensity="1"
-      exposure="1"
-      touch-action="pan-y"
-      interpolation-decay="160"
-      onDoubleClick={toggleNativeZoom}
-      className={cn('block h-full w-full bg-transparent', className)}
-    />
+    <div className={cn('relative h-full w-full', className)}>
+      {registered && (
+        <model-viewer
+          ref={(element) => {
+            nativeViewerRef.current = element as NativeModelViewerElement | null
+          }}
+          src={src}
+          alt={alt}
+          poster={poster}
+          camera-controls
+          {...(active ? { 'auto-rotate': true } : {})}
+          shadow-intensity="1"
+          exposure="1"
+          touch-action="pan-y"
+          interpolation-decay="160"
+          onDoubleClick={toggleNativeZoom}
+          className="block h-full w-full bg-transparent"
+        />
+      )}
+      <ParticleField active={!registered || !nativeLoaded} label="Loading 3D model" className="absolute inset-0 z-10" />
+    </div>
   )
 }
