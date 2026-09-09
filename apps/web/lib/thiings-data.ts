@@ -73,6 +73,22 @@ const FIELD_NAMES = {
 
 const notion = new NotionAPI()
 
+const LOCAL_FALLBACK_ITEMS: ThiingsItem[] = Array.from({ length: 9 }, (_, index) => {
+  const itemNumber = index + 1
+  return {
+    id: `local-${itemNumber}`,
+    image: `/thiings/${itemNumber}.png`,
+    name: `Local Thing ${itemNumber}`,
+    description: 'Local fallback item used when Notion content is unavailable.',
+    tags: ['local']
+  }
+})
+
+function getLocalFallbackItems(): ThiingsItem[] {
+  if (process.env.THIINGS_DISABLE_LOCAL_FALLBACK === 'true') return []
+  return LOCAL_FALLBACK_ITEMS
+}
+
 function unwrapNotionValue<T = unknown>(box: unknown): T | undefined {
   if (!isRecord(box)) return undefined
   const value = box.value
@@ -312,42 +328,53 @@ async function signNotionResources(items: ThiingsItemDraft[]): Promise<ThiingsIt
 
 async function fetchThiingsItems(): Promise<ThiingsItem[]> {
   const pageId = process.env.NOTION_PAGE_ID
-  if (!pageId) return []
+  if (!pageId) return getLocalFallbackItems()
 
-  const pageRecordMap = (await notion.getPage(pageId, {
-    fetchCollections: true,
-    signFileUrls: true
-  })) as NotionRecordMap
-  const collectionInfo = getCollectionInfo(pageRecordMap)
-  if (!collectionInfo) return []
+  try {
+    const pageRecordMap = (await notion.getPage(pageId, {
+      fetchCollections: true,
+      signFileUrls: true
+    })) as NotionRecordMap
+    const collectionInfo = getCollectionInfo(pageRecordMap)
+    if (!collectionInfo) return getLocalFallbackItems()
 
-  const collectionData = (await notion.getCollectionData(
-    collectionInfo.collectionId,
-    collectionInfo.collectionViewId,
-    collectionInfo.collectionView
-  )) as { recordMap?: NotionRecordMap; result?: CollectionQueryResult }
+    const collectionData = (await notion.getCollectionData(
+      collectionInfo.collectionId,
+      collectionInfo.collectionViewId,
+      collectionInfo.collectionView
+    )) as { recordMap?: NotionRecordMap; result?: CollectionQueryResult }
 
-  const recordMap = collectionData.recordMap ?? pageRecordMap
-  const collection = unwrapNotionValue<NotionCollection>(recordMap.collection?.[collectionInfo.collectionId])
-  const blockIds = getCollectionResultBlockIds(collectionData.result)
+    const recordMap = collectionData.recordMap ?? pageRecordMap
+    const collection = unwrapNotionValue<NotionCollection>(recordMap.collection?.[collectionInfo.collectionId])
+    const blockIds = getCollectionResultBlockIds(collectionData.result)
 
-  const items = blockIds
-    .map((blockId, index) => {
-      const page = unwrapNotionValue<NotionBlock>(recordMap.block?.[blockId])
-      if (!page) return undefined
-      const item = mapPageToItem(page, collection)
-      if (!item) return undefined
-      return {
-        item,
-        order: getOrder(page, collection),
-        index
-      }
-    })
-    .filter((entry): entry is { item: ThiingsItemDraft; order: number; index: number } => Boolean(entry))
-    .sort((a, b) => a.order - b.order || a.index - b.index)
-    .map(({ item }) => item)
+    const items = blockIds
+      .map((blockId, index) => {
+        const page = unwrapNotionValue<NotionBlock>(recordMap.block?.[blockId])
+        if (!page) return undefined
+        const item = mapPageToItem(page, collection)
+        if (!item) return undefined
+        return {
+          item,
+          order: getOrder(page, collection),
+          index
+        }
+      })
+      .filter((entry): entry is { item: ThiingsItemDraft; order: number; index: number } => Boolean(entry))
+      .sort((a, b) => a.order - b.order || a.index - b.index)
+      .map(({ item }) => item)
 
-  return signNotionResources(items)
+    if (!items.length) return getLocalFallbackItems()
+    return signNotionResources(items)
+  } catch (error) {
+    const fallbackItems = getLocalFallbackItems()
+    if (fallbackItems.length) {
+      const reason = error instanceof Error ? error.message : String(error)
+      console.warn(`Failed to load Notion thiings; using local fallback items. ${reason}`)
+      return fallbackItems
+    }
+    throw error
+  }
 }
 
 const getCachedThiingsItems = unstable_cache(fetchThiingsItems, ['thiings-notion-items'], {
@@ -355,11 +382,12 @@ const getCachedThiingsItems = unstable_cache(fetchThiingsItems, ['thiings-notion
 })
 
 export async function getThiingsItems(): Promise<ThiingsItem[]> {
+  if (process.env.NODE_ENV !== 'production') return fetchThiingsItems()
   return getCachedThiingsItems()
 }
 
 export async function getThiingsItem(id: string): Promise<ThiingsItem | undefined> {
   const normalizedId = id.replaceAll('-', '')
   const items = await getThiingsItems()
-  return items.find((item) => item.id === normalizedId)
+  return items.find((item) => item.id.replaceAll('-', '') === normalizedId)
 }
