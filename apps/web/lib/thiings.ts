@@ -18,6 +18,7 @@ export function isNotionHostedResource(url: string | undefined): boolean {
     const hostname = parsed.hostname.toLowerCase()
 
     return (
+      hostname === 'file.notion.com' ||
       hostname === 'file.notion.so' ||
       hostname === 'img.notionusercontent.com' ||
       hostname === 'www.notion.so' ||
