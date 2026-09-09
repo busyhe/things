@@ -162,14 +162,14 @@ importers:
         specifier: 'catalog:'
         version: 0.4.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       notion-client:
-        specifier: 7.10.0
-        version: 7.10.0
+        specifier: 8.0.8
+        version: 8.0.8
       notion-types:
-        specifier: 7.10.0
-        version: 7.10.0
+        specifier: 8.0.8
+        version: 8.0.8
       notion-utils:
-        specifier: 7.10.0
-        version: 7.10.0
+        specifier: 8.0.8
+        version: 8.0.8
       react:
         specifier: 'catalog:'
         version: 19.2.5
@@ -1993,9 +1993,9 @@ packages:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
 
-  memoize@10.2.0:
-    resolution: {integrity: sha512-DeC6b7QBrZsRs3Y02A6A7lQyzFbsQbqgjI6UW0GigGWV+u1s25TycMr0XHZE4cJce7rY/vyw2ctMQqfDkIhUEA==}
-    engines: {node: '>=18'}
+  memoize@11.0.0:
+    resolution: {integrity: sha512-cjsfZaC9b1clqPeIVMbb5dLHSXgdgGWGxdAU3oTUUkHiwWTKTBNnSmcqWJncNjYtBi3S8Rp0c5GIiyGztR8TRA==}
+    engines: {node: '>=22'}
 
   merge-stream@2.0.0:
     resolution: {integrity: sha512-abv/qOcuPfk3URPfDzmZU1LKmuw8kT+0nIHvKrKgFrwifol/doWcdA4ZqsWQ8ENrFKkd67Mfpo/LovbIUsbt3w==}
@@ -2104,9 +2104,6 @@ packages:
   no-case@2.3.2:
     resolution: {integrity: sha512-rmTZ9kz+f3rCvK2TD1Ue/oZlns7OGoIWP4fc3llxxRXlOkHKoWPPWJOfFYpITabSow43QJbRIoHQXtt10VldyQ==}
 
-  node-fetch-native@1.6.6:
-    resolution: {integrity: sha512-8Mc2HhqPdlIfedsuZoc3yioPuzp6b+L5jRCRY1QzuWZh2EGJVQrGppC6V6cF0bLdbW0+O2YpqCA25aF/1lvipQ==}
-
   node-fetch-native@1.6.7:
     resolution: {integrity: sha512-g9yhqoedzIUm0nTnTqAQvueMPVOuIY16bqgAJJC8XOOubYFNwz6IER9qs0Gq2Xd0+CecCKFjtdDTMA4u4xG06Q==}
 
@@ -2114,20 +2111,20 @@ packages:
     resolution: {integrity: sha512-Cov028YhBZ5aB7MdMWJEmwyBig43aGL5WT4vdoB28Oitau1zZAcHUn8Sgfk9HM33TqhtLJ9PlM/O0Mv+QpV/4Q==}
     engines: {node: '>=8.9.4'}
 
-  normalize-url@8.1.1:
-    resolution: {integrity: sha512-JYc0DPlpGWB40kH5g07gGTrYuMqV653k3uBKY6uITPWds3M0ov3GaWGp9lbE3Bzngx8+XkfzgvASb9vk9JDFXQ==}
-    engines: {node: '>=14.16'}
+  normalize-url@9.0.1:
+    resolution: {integrity: sha512-ARftfC5HdUNu9jJeL8pHj8debUIHA2b91FizCoMzY4lG6dDX13jdvTK0TBe24IBDRf2HvJSzzwEPvmbkQWHRSg==}
+    engines: {node: '>=20'}
 
-  notion-client@7.10.0:
-    resolution: {integrity: sha512-Rb4/nR4vIRwIExvKiVhZKJEpGoE0IRFlHMKbs0tcZcecZaUVRzVAu7PHuaHC5ivSds26z497dxXYF3mnMrMt7g==}
+  notion-client@8.0.8:
+    resolution: {integrity: sha512-5oRaef3lxsaM7KOIKcTTlhnAI8KSj5FQH7uA0tmgLxjBMLmE40/+orwIzwIBi8PvTeTsx+Gj8k9CBAOg5XB7fg==}
     engines: {node: '>=18'}
 
-  notion-types@7.10.0:
-    resolution: {integrity: sha512-t57RdnGnup7NcMGJkrlshe3gXaFYOj565NL1Q1l/MrZZ/K2xbHO06PtBXDEFTFYjvxQagU0NzKzaSNKocU9e4Q==}
+  notion-types@8.0.8:
+    resolution: {integrity: sha512-crMgFadWAa1XSOMBAKfgy1eB9RW9e1v7j61lm0/ksalz91tCJwbu1sYbkbjvB1UWjC3jHhuKfwsT4FkUZh8z9w==}
     engines: {node: '>=18'}
 
-  notion-utils@7.10.0:
-    resolution: {integrity: sha512-Z/L+xOzVWM5wBHOqLu3PwCzA/11yzVExMpR8FUcwHbS60DDULSgZgipXQBzKOlbQMnB+04BOkSGDNan+AxfxmA==}
+  notion-utils@8.0.8:
+    resolution: {integrity: sha512-TGOmuJqOjOXeBhi1Tab8OyuAUSDrNi8C4skRpIwRGrBGZCKtql2WB9BwcAgNQCt+bwUlyQfmPmEnI7DwibythQ==}
     engines: {node: '>=18'}
 
   npm-run-path@4.0.1:
@@ -2212,17 +2209,17 @@ packages:
     resolution: {integrity: sha512-d3qXVTF/s+W+CdJ5A29wywV2n8CQQYahlgz2bFiA+4eVNJbHJodPZ+/gXwPGh0bOqA+j8S+6+ckmvLGPk1QpxQ==}
     engines: {node: '>=8'}
 
-  p-map@7.0.4:
-    resolution: {integrity: sha512-tkAQEw8ysMzmkhgw8k+1U/iPhWNhykKnSk4Rd5zLoPJCuJaGRPo6YposrZgaxHKzDHdDWWZvE/Sk7hsL2X/CpQ==}
+  p-map@7.0.7:
+    resolution: {integrity: sha512-VaWRu2i4FJNRtiRWCuuQRgfQ1B7a6+gMSrO+3j0EQi/k0ULfS9kosRxGoiqwzIjZTDI02tGfk5mXXltLg6QtfQ==}
     engines: {node: '>=18'}
 
-  p-queue@8.1.1:
-    resolution: {integrity: sha512-aNZ+VfjobsWryoiPnEApGGmf5WmNsCo9xu8dfaYamG5qaLP7ClhLN6NgsFe6SwJ2UbLEBK5dv9x8Mn5+RVhMWQ==}
-    engines: {node: '>=18'}
+  p-queue@9.3.3:
+    resolution: {integrity: sha512-NXAOdnEe5FsZJfT4oK84lE1Y5cFFdWlRuOo5tww8DyNMxyRXwn39fIkUtNLKppcPC+UYU/bXujNCUGDv01y7CA==}
+    engines: {node: '>=20'}
 
-  p-timeout@6.1.4:
-    resolution: {integrity: sha512-MyIV3ZA/PmyBN/ud8vV9XzwTrNtR4jFrObymZYnZqMmW0zA8Z17vnT0rBgFE/TlohB+YCHqXMgZzb3Csp49vqg==}
-    engines: {node: '>=14.16'}
+  p-timeout@7.0.1:
+    resolution: {integrity: sha512-AxTM2wDGORHGEkPCt8yqxOTMgpfbEHqF51f/5fJCmwFC3C/zNcGT63SymH2ttOAaiIws2zVg4+izQCjrakcwHg==}
+    engines: {node: '>=20'}
 
   pac-proxy-agent@7.2.0:
     resolution: {integrity: sha512-TEB8ESquiLMc0lV8vcd5Ql/JAKAoyzHFXaStwjkzpOpC5Yv+pIzLfHvjTSdf3vpa2bMiUQrg9i6276yn8666aA==}
@@ -4118,7 +4115,7 @@ snapshots:
       citty: 0.1.6
       consola: 3.4.2
       defu: 6.1.4
-      node-fetch-native: 1.6.6
+      node-fetch-native: 1.6.7
       nypm: 0.6.0
       pathe: 2.0.3
 
@@ -4628,7 +4625,7 @@ snapshots:
 
   math-intrinsics@1.1.0: {}
 
-  memoize@10.2.0:
+  memoize@11.0.0:
     dependencies:
       mimic-function: 5.0.1
 
@@ -4720,8 +4717,6 @@ snapshots:
     dependencies:
       lower-case: 1.1.4
 
-  node-fetch-native@1.6.6: {}
-
   node-fetch-native@1.6.7: {}
 
   node-plop@0.26.3:
@@ -4738,24 +4733,24 @@ snapshots:
       mkdirp: 0.5.6
       resolve: 1.22.10
 
-  normalize-url@8.1.1: {}
+  normalize-url@9.0.1: {}
 
-  notion-client@7.10.0:
+  notion-client@8.0.8:
     dependencies:
-      notion-types: 7.10.0
-      notion-utils: 7.10.0
+      notion-types: 8.0.8
+      notion-utils: 8.0.8
       ofetch: 1.5.1
-      p-map: 7.0.4
+      p-map: 7.0.7
 
-  notion-types@7.10.0: {}
+  notion-types@8.0.8: {}
 
-  notion-utils@7.10.0:
+  notion-utils@8.0.8:
     dependencies:
       is-url-superb: 6.1.0
-      memoize: 10.2.0
-      normalize-url: 8.1.1
-      notion-types: 7.10.0
-      p-queue: 8.1.1
+      memoize: 11.0.0
+      normalize-url: 9.0.1
+      notion-types: 8.0.8
+      p-queue: 9.3.3
 
   npm-run-path@4.0.1:
     dependencies:
@@ -4872,14 +4867,14 @@ snapshots:
     dependencies:
       aggregate-error: 3.1.0
 
-  p-map@7.0.4: {}
+  p-map@7.0.7: {}
 
-  p-queue@8.1.1:
+  p-queue@9.3.3:
     dependencies:
       eventemitter3: 5.0.4
-      p-timeout: 6.1.4
+      p-timeout: 7.0.1
 
-  p-timeout@6.1.4: {}
+  p-timeout@7.0.1: {}
 
   pac-proxy-agent@7.2.0:
     dependencies:
